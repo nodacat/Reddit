@@ -1,0 +1,55 @@
+Public Sub test()
+    Dim rngSrc As Excel.Range
+    Dim numbers As Variant
+    Dim n As Variant
+    Dim shtChild As Excel.Worksheet
+    
+    'Get source range
+    With Excel.ThisWorkbook.Worksheets("Sheet1")
+        Set rngSrc = Range(.Range("A1"), .Range("A1").End(xlDown).End(xlToRight))
+    End With
+    
+    'Populate array with list of unique values from "No." column of report (column 4)
+    numbers = Excel.WorksheetFunction.Unique(rngSrc.Offset(1, 0).Resize(rngSrc.Rows.Count - 1).Columns(4))
+    
+    'Iterate through source range
+    For Each n In numbers
+        'Filter data
+        rngSrc.Worksheet.AutoFilterMode = False
+        rngSrc.AutoFilter Field:=4, Criteria1:=n
+        
+        'Prepare child sheet
+        Set shtChild = GetSheet("No." & CStr(n))    'Get Child Sheet
+        shtChild.AutoFilterMode = False             'Remove autofilter if present
+        shtChild.UsedRange.ClearContents            'Clear existing data
+
+        'Copy filtered data to new worksheet
+        rngSrc.SpecialCells(xlCellTypeVisible).Copy shtChild.Range("A1")
+        
+        'Set autofilter for use by user later (optional)
+        shtChild.UsedRange.AutoFilter
+        
+        'clear clipboard
+        Application.CutCopyMode = False
+    Next
+    
+    'reset view
+    rngSrc.Worksheet.Activate
+    rngSrc.Cells(1, 1).Select
+    rngSrc.Worksheet.AutoFilterMode = False
+
+End Sub
+Function GetSheet(ByVal shtName As String) As Excel.Worksheet
+    'Returns worksheet by name, or creates one if it doesn't exist
+    On Error GoTo CreateSheet
+    Set GetSheet = Excel.ThisWorkbook.Worksheets(shtName)
+    Exit Function
+CreateSheet:
+    With Excel.ThisWorkbook.Worksheets
+        Dim sht As Excel.Worksheet
+        Set sht = .Add(After:=.Item(.Count))
+        sht.Name = shtName
+        Set GetSheet = sht
+    End With
+End Function
+
