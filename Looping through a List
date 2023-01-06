@@ -1,3 +1,4 @@
+'for: https://www.reddit.com/r/vba/comments/104yh0z/looping_through_a_list/
 Public Sub test()
     Dim rngSrc As Excel.Range
     Dim numbers As Variant
