@@ -64,10 +64,10 @@ Public Sub ConvertSheetsToCSV()
         fileName = Dir 'Get Next File
     Wend
     
-    wbTmp.Close False
 Suberror: 'If error occurs, be sure to reset users' settings to normal
     Application.DisplayAlerts = True
     Application.ScreenUpdating = True
+    wbTmp.Close False
 End Sub
 
 Private Function ADOTableExists(ByRef cn As ADODB.Connection, ByVal shtName As String) As Boolean
