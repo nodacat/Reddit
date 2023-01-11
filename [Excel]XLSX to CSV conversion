@@ -1,3 +1,4 @@
+'for: https://www.reddit.com/r/vba/comments/107je0b/excelxlsx_to_csv_conversion/
 Const SRC_PATH As String = "C:\Users\nodacat\Desktop\Source"
 Const DES_PATH As String = "C:\Users\nodacat\Desktop\Destination"
 Const SHEET_NAME As String = "Sheet2$"
