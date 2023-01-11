@@ -2,7 +2,7 @@ Const SRC_PATH As String = "C:\Users\nodacat\Desktop\Source"
 Const DES_PATH As String = "C:\Users\nodacat\Desktop\Destination"
 Const SHEET_NAME As String = "Sheet2$"
 Const SHEET_RANGE As String = "" 'Optional, set to pull specific excel ranges, ex A1:C1, or leave blank to pull it all
-Const QUERY As String = "select * from [<SHEET_NAME>]"
+Const QUERY As String = "select * from [<SHEET_NAME>]" 'We replace <SHEET_NAME> later
 
 'Pre-Reqs!
 ' Be sure to go to Tools>References and add the 'Microsoft ActiveX Data Objects 6.1 Library
