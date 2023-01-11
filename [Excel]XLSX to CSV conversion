@@ -7,6 +7,12 @@ Const QUERY As String = "select * from [<SHEET_NAME>]" 'We replace <SHEET_NAME> 
 'Pre-Reqs!
 ' Be sure to go to Tools>References and add the 'Microsoft ActiveX Data Objects 6.1 Library
 
+'TODO:
+' Pulls all .xls* files from SRC_PATH
+' Extracts the data in SHEET_NAME/SHEET_RANGE using ADODB
+' Stores in a temporary workbook
+' Saves workbook as CSV in DES_PATH
+
 Public Sub ConvertSheetsToCSV()
     Dim cn As New ADODB.Connection
     Dim rs As New ADODB.Recordset
