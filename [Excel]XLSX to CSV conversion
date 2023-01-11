@@ -1,0 +1,80 @@
+Const SRC_PATH As String = "C:\Users\nodacat\Desktop\Source"
+Const DES_PATH As String = "C:\Users\nodacat\Desktop\Destination"
+Const SHEET_NAME As String = "Sheet2$"
+Const SHEET_RANGE As String = "" 'Optional, set to pull specific excel ranges, ex A1:C1, or leave blank to pull it all
+Const QUERY As String = "select * from [<SHEET_NAME>]"
+
+'Pre-Reqs!
+' Be sure to go to Tools>References and add the 'Microsoft ActiveX Data Objects 6.1 Library
+
+Public Sub ConvertSheetsToCSV()
+    Dim cn As New ADODB.Connection
+    Dim rs As New ADODB.Recordset
+    
+    Dim fileName As Variant
+    Dim newFileName As Variant
+    Dim wbTmp As Excel.Workbook
+    Set wbTmp = Excel.Workbooks.Add()
+    
+    On Error GoTo Suberror
+    
+    Application.ScreenUpdating = False
+    fileName = Dir(SRC_PATH & "\*.xls*")
+    
+    While (fileName <> "")
+        
+        Debug.Print "..Working on: " & fileName
+        
+        cn.Open _
+            "Provider=Microsoft.ACE.OLEDB.12.0;" & _
+            "Data Source=" & SRC_PATH & "\" & fileName & ";" & _
+            "Extended Properties=""Excel 12.0 XML; HDR=No;IMEX=0"";"
+            
+        If ADOTableExists(cn, SHEET_NAME) Then
+            
+            'run query and populate temp workbook with data
+            rs.Open Replace$(QUERY, "<SHEET_NAME>", SHEET_NAME & SHEET_RANGE), cn, adOpenStatic, adLockReadOnly, adCmdText
+            With wbTmp.Worksheets(1)
+                .Cells.ClearContents
+                .Range("A1").CopyFromRecordset rs
+            End With
+            
+            'create new file name, and convert to CSV
+            newFileName = DES_PATH & "\" & Left(fileName, InStr(1, fileName, ".xls", vbBinaryCompare) - 1) & ".csv"
+            
+            'save temp workbook as CSV file.  If running this over and over, ignore overwrite to destination with DisplayAlerts=false
+            Application.DisplayAlerts = False
+            wbTmp.SaveAs newFileName, XlFileFormat.xlCSV
+            Application.DisplayAlerts = True
+            
+            rs.Close
+            Debug.Print "...DONE"
+        Else
+            Debug.Print "...SKIPPED - Workbook contains no sheet called '" & SHEET_NAME & "'"
+        End If
+
+        cn.Close
+        fileName = Dir 'Get Next File
+    Wend
+    
+    wbTmp.Close False
+Suberror: 'If error occurs, be sure to reset users' settings to normal
+    Application.DisplayAlerts = True
+    Application.ScreenUpdating = True
+End Sub
+
+Private Function ADOTableExists(ByRef cn As ADODB.Connection, ByVal shtName As String) As Boolean
+    'Checks connetion if table/sheet exists
+    Dim rs As New ADODB.Recordset
+    Dim rtn As Boolean
+    rtn = False
+    rs.Open cn.OpenSchema(adSchemaTables)
+    While Not (rs.EOF Or rtn)
+        If rs.Fields("table_name").Value = shtName Then
+            rtn = True
+        End If
+        rs.MoveNext
+    Wend
+    rs.Close
+    ADOTableExists = rtn
+End Function
