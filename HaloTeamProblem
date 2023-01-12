@@ -1,12 +1,11 @@
 #==============================================================================================================================================
-#Populate variables here (use excel formulas below to help)
+#Populate variables here (use excel formulas to right to help)
 
 # People
 #   dictionary containing name/nc score pairs
 #   use this excel formula to help populate, example has Names in B7:B20 and NC Scores in C7:C20
 #   ="{"&TEXTJOIN(", ",TRUE,"'"&B7:B20&"' : "&C7:C20)&"}"
-people = {'kevin N.' : -12.25, 'Mike' : -4.25, 'Jordan' : -0.15, 'Gabe' : 1.37, 'Jerry' : 2.25, 'Nick' : 5.35, 'Craig' : 5.83, 'Adam' : 6.55, 'Derek' : 6.62, 'Brandon P.' : 8.32, 'Al' : 8.39, 'John' : 11.23, 'Brandon A.' : 14.18, 'Erik' : 12.93, 'Matt' : 14.8}
-
+people = {'Jackie':-3.13,'Jordan':-0.15,'Nick M.':5.35,'Craig':5.83,'Derek':6.62,'JP':7.00,'Nick J.':7.50,'Brandon P.':8.32,'Al':8.39,'John':11.23,'Erik':12.98,'Matt':14.80,'TJ':18.82}
 #maximum time to return whatever the current best answer is
 maxWait = 4000 
 
@@ -15,7 +14,7 @@ maxWait = 4000
 #   you can tweak these numbers to say split 6 people into 2 groups of 3 or 3 groups of 2 by changing the number in the 6th index, for example
 #   if people cant be distributed evenly in each groups, 'dummy' people are created to help balance (then removed later)
 #  numPeople : 0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 
-teamCount  = [ 0, 1, 2, 3, 2, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4, 4, 4] #ex) for 16 people, we break into 4 teams
+teamCount  = [ 0, 1, 2, 3, 2, 2, 2, 2, 2, 3, 3, 4, 3, 4, 4, 4, 4] #ex) for 16 people, we break into 4 teams
 
 #Dummy NC Score
 # when dummy people are needed to create even groupings, they'll take on this NC score
@@ -25,6 +24,7 @@ dummyNCScore = 0
 
 import itertools
 import time
+from math import ceil
 
 #Class to help break out of nested loops later
 class LoopLeave(Exception):
@@ -34,18 +34,21 @@ class LoopLeave(Exception):
 numPeople = len(people)
 numTeams = teamCount[numPeople]
 dummyCount = int((numTeams - (numPeople/numTeams % 1) * numTeams) % numTeams)
-mean = sum(people.values()) / numPeople
+maxDummiesPerTeam = int(ceil(dummyCount/numTeams))
 
 #Add Dummies if needed
 print("Creating " + str(dummyCount) + " dummy(s) with NC score of " + str(dummyNCScore))
+dummySet = set([f'DUMMY{i}' for i in range(dummyCount)])
 if dummyCount > 0:
 	for i in range(dummyCount):
-		people["DUMMY"+str(i+1)] = dummyNCScore
+		people[list(dummySet)[i]] = dummyNCScore
 	numPeople = len(people)
 
 print("Preparing " + str(numTeams) + " teams of " + str(int(numPeople/numTeams)) + " people each...")
 
 #Get list of all possible combinations of people (teams)
+mean = sum(people.values()) / numPeople
+people = dict(sorted(people.items(), key=lambda item: item[1]))
 teams = list(itertools.combinations(people.keys(), int(numPeople/numTeams)))
 teamScores = [0 for i in range(len(teams))]
 
@@ -68,7 +71,7 @@ try:
 	#Check Team A Grouping
 	for a in range(totCombos):
 		sa = set(teams_sorted[a])
-		if scores_sorted[a] < minScore:
+		if (scores_sorted[a] < minScore) and (len((sa & dummySet)) <= maxDummiesPerTeam):
 			if numTeams <= 1:
 				tmpScore = scores_sorted[a]
 				if tmpScore < minScore:
@@ -80,7 +83,7 @@ try:
 				#Check Team B Grouping
 				for b in range(a+1, totCombos):
 					sb = set(teams_sorted[b])
-					if not ((sb & sa)) and (scores_sorted[b] < minScore):
+					if not ((sb & sa)) and (scores_sorted[b] < minScore) and (len((sb & dummySet))<=maxDummiesPerTeam):
 						if numTeams <= 2:
 							tmpScore = scores_sorted[a] + scores_sorted[b]
 							if tmpScore < minScore:
@@ -94,7 +97,7 @@ try:
 							#Check Team C Grouping
 							for c in range(b+1, totCombos):
 								sc = set(teams_sorted[c])
-								if not ((sc & sa) or (sc & sb)) and (scores_sorted[c] < minScore):
+								if not ((sc & sa) or (sc & sb)) and (scores_sorted[c] < minScore) and (len((sc & dummySet))<=maxDummiesPerTeam):
 									if numTeams <= 3:
 										tmpScore = scores_sorted[a] + scores_sorted[b] + scores_sorted[c]
 										if tmpScore < minScore:
@@ -108,7 +111,7 @@ try:
 										#Check Team D Grouping
 										for d in range(c+1, totCombos):
 											sd = set(teams_sorted[d])
-											if not ((sd & sa) or (sd & sb) or (sd & sc)) and (scores_sorted[d] < minScore):
+											if not ((sd & sa) or (sd & sb) or (sd & sc)) and (scores_sorted[d] < minScore) and (len((sd & dummySet))<=maxDummiesPerTeam):
 												if numTeams <= 4:
 													tmpScore = scores_sorted[a] + scores_sorted[b] + scores_sorted[c] + scores_sorted[d]
 													if tmpScore < minScore:
