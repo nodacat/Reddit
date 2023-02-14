@@ -1,19 +1,19 @@
 'For https://www.reddit.com/r/excel/comments/1124xdz/dart_league_select_3_games_for_each_participant/
+
 Const MATCHES_PER_PERSON As Integer = 3
 Const MATCH_FORMAT As String = "<player1> vs <player2>"  'must include "<player1>" and "<player2>" somewhere
 
+'MUST INCLUDE:: Tools>References>Microsoft Scripting Runtime
 
 Public Sub GenerateMatches()
     
-    Dim players As Object
+    Dim players As New Scripting.Dictionary
     Dim matches As New Collection
     Dim matchMaxCount As Long
     Dim match As String
     Dim matchSheet As Excel.Worksheet
     Dim matchExists As Boolean
     Dim i As Long, r1 As Long, r2 As Long
-    
-    Set players = CreateObject("Scripting.Dictionary") 'alternatively you could include the "Microsoft Scripting Runtime" library and early bind the dictionary
     
     'Build player dictionary
     With Excel.ThisWorkbook.Worksheets("Deelnemers")
@@ -37,7 +37,7 @@ Public Sub GenerateMatches()
     matchMaxCount = players.Count * MATCHES_PER_PERSON
     
     'Generate matches
-    While matches.Count < matchMaxCount And players.Count > 1
+    While matches.Count <= matchMaxCount And players.Count > 1
     
         'get two, non-matching, random player indicies
         r1 = Excel.WorksheetFunction.RandBetween(0, players.Count - 1)
@@ -59,6 +59,7 @@ Public Sub GenerateMatches()
         
         'If new match, add to colleciton and reduce both players by 1 point, removing them if zero to improve effeciency of macro
         If Not matchExists Then
+            Debug.Print players.Count
             match = Replace$(Replace$(MATCH_FORMAT, "<player1>", players.Keys(r1)), "<player2>", players.Keys(r2))
             matches.Add match
             matchSheet.Cells(matches.Count, "A").Value2 = match
