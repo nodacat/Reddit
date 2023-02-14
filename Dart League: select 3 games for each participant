@@ -1,0 +1,96 @@
+'For https://www.reddit.com/r/excel/comments/1124xdz/dart_league_select_3_games_for_each_participant/
+Const MATCHES_PER_PERSON As Integer = 3
+Const MATCH_FORMAT As String = "<player1> vs <player2>"  'must include "<player1>" and "<player2>" somewhere
+
+
+Public Sub GenerateMatches()
+    
+    Dim players As Object
+    Dim matches As New Collection
+    Dim matchMaxCount As Long
+    Dim match As String
+    Dim matchSheet As Excel.Worksheet
+    Dim matchExists As Boolean
+    Dim i As Long, r1 As Long, r2 As Long
+    
+    Set players = CreateObject("Scripting.Dictionary") 'alternatively you could include the "Microsoft Scripting Runtime" library and early bind the dictionary
+    
+    'Build player dictionary
+    With Excel.ThisWorkbook.Worksheets("Deelnemers")
+        For i = 1 To .Cells(.Rows.Count, "A").End(xlUp).Row
+            If Not players.Exists(.Cells(i, "A").Value2) And .Cells(i, "A").Value2 <> "" Then
+                players.Add .Cells(i, "A").Value2, MATCHES_PER_PERSON
+            Else
+                'player already exists, maybe alert the user of the duplicate?
+            End If
+        Next
+    End With
+    
+    'Check there are enough users for matches
+    If players.Count < MATCHES_PER_PERSON ^ 2 Then
+        err.Raise vbObjectError + 13, "CreateMatchSheet", "Not enough players for each player to have " & CStr(MATCHES_PER_PERSON) & " unique matches per person"
+        Exit Sub
+    End If
+    
+    'Get Output sheet
+    Set matchSheet = GetSheet("Maand")
+    matchMaxCount = players.Count * MATCHES_PER_PERSON
+    
+    'Generate matches
+    While matches.Count < matchMaxCount And players.Count > 1
+    
+        'get two, non-matching, random player indicies
+        r1 = Excel.WorksheetFunction.RandBetween(0, players.Count - 1)
+        r2 = r1
+        While r2 = r1
+            r2 = Excel.WorksheetFunction.RandBetween(0, players.Count - 1)
+            DoEvents
+        Wend
+        
+        'Check if random pair is already in matches collection
+        matchExists = False
+        For i = 1 To matches.Count
+            If InStr(1, matches(i), players.Keys(r1), vbBinaryCompare) <> 0 Then
+                If InStr(1, matches(i), players.Keys(r2), vbBinaryCompare) <> 0 Then
+                    matchExists = True
+                End If
+            End If
+        Next
+        
+        'If new match, add to colleciton and reduce both players by 1 point, removing them if zero to improve effeciency of macro
+        If Not matchExists Then
+            match = Replace$(Replace$(MATCH_FORMAT, "<player1>", players.Keys(r1)), "<player2>", players.Keys(r2))
+            matches.Add match
+            matchSheet.Cells(matches.Count, "A").Value2 = match
+            Debug.Print "..added " & match
+            ReducePlayerDictionary players, _
+                players.Keys(r1), players.Items(r1) - 1, _
+                players.Keys(r2), players.Items(r2) - 1
+        End If
+        
+        DoEvents
+    Wend
+    
+End Sub
+
+Public Sub ReducePlayerDictionary(ByRef players As Scripting.Dictionary, ByVal key1 As String, ByVal val1 As Integer, ByVal key2 As String, ByVal val2 As Integer)
+    players.Remove key1
+    players.Remove key2
+    
+    If val1 > 0 Then players.Add key1, val1
+    If val2 > 0 Then players.Add key2, val2
+End Sub
+
+Public Function GetSheet(ByVal sheetName As String) As Excel.Worksheet
+    'Wipes/add and returns sheet
+    Dim ws As Excel.Worksheet
+    On Error GoTo FuncError
+    Set ws = Excel.ThisWorkbook.Worksheets(sheetName)
+    ws.UsedRange.Clear
+    Set GetSheet = ws
+    Exit Function
+FuncError:
+    Set ws = Excel.ThisWorkbook.Worksheets.Add
+    ws.name = sheetName
+    Set GetSheet = ws
+End Function
