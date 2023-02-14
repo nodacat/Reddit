@@ -37,7 +37,7 @@ Public Sub GenerateMatches()
     matchMaxCount = players.Count * MATCHES_PER_PERSON
     
     'Generate matches
-    While matches.Count <= matchMaxCount And players.Count > 1
+    While matches.Count < matchMaxCount And players.Count > 1
     
         'get two, non-matching, random player indicies
         r1 = Excel.WorksheetFunction.RandBetween(0, players.Count - 1)
