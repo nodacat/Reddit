@@ -1,86 +1,117 @@
 'For https://www.reddit.com/r/excel/comments/1124xdz/dart_league_select_3_games_for_each_participant/
-
-Const MATCHES_PER_PERSON As Integer = 3
 Const MATCH_FORMAT As String = "<player1> vs <player2>"  'must include "<player1>" and "<player2>" somewhere
 
-'MUST INCLUDE:: Tools>References>Microsoft Scripting Runtime
-
 Public Sub GenerateMatches()
-    
-    Dim players As New Scripting.Dictionary
-    Dim matches As New Collection
-    Dim matchMaxCount As Long
-    Dim match As String
     Dim matchSheet As Excel.Worksheet
-    Dim matchExists As Boolean
-    Dim i As Long, r1 As Long, r2 As Long
-    
+    Dim players As New Collection
+    Dim matches As New Collection
+    Dim a As Variant
+    Dim aStart As Long, aEnd As Long, aStep As Long
+    Dim i As Long, j As Long
+        
     'Build player dictionary
     With Excel.ThisWorkbook.Worksheets("Deelnemers")
         For i = 1 To .Cells(.Rows.Count, "A").End(xlUp).Row
-            If Not players.Exists(.Cells(i, "A").Value2) And .Cells(i, "A").Value2 <> "" Then
-                players.Add .Cells(i, "A").Value2, MATCHES_PER_PERSON
+            If Not ExistsInCollection(players, .Cells(i, "A").Value2) And .Cells(i, "A").Value2 <> "" Then
+                players.Add .Cells(i, "A").Value2
             Else
                 'player already exists, maybe alert the user of the duplicate?
             End If
         Next
     End With
+    RandomizeCollection players
     
-    'Check there are enough users for matches
-    If players.Count < MATCHES_PER_PERSON ^ 2 Then
-        err.Raise vbObjectError + 13, "CreateMatchSheet", "Not enough players for each player to have " & CStr(MATCHES_PER_PERSON) & " unique matches per person"
-        Exit Sub
-    End If
-    
-    'Get Output sheet
-    Set matchSheet = GetSheet("Maand")
-    matchMaxCount = players.Count * MATCHES_PER_PERSON
-    
-    'Generate matches
-    While matches.Count < matchMaxCount And players.Count > 1
-    
-        'get two, non-matching, random player indicies
-        r1 = Excel.WorksheetFunction.RandBetween(0, players.Count - 1)
-        r2 = r1
-        While r2 = r1
-            r2 = Excel.WorksheetFunction.RandBetween(0, players.Count - 1)
-            DoEvents
-        Wend
-        
-        'Check if random pair is already in matches collection
-        matchExists = False
-        For i = 1 To matches.Count
-            If InStr(1, matches(i), players.Keys(r1), vbBinaryCompare) <> 0 Then
-                If InStr(1, matches(i), players.Keys(r2), vbBinaryCompare) <> 0 Then
-                    matchExists = True
-                End If
+    'Iterate through players colleciton to build a chain of matches, output to match sheet
+    Select Case True
+    Case players.Count < 4
+        'Error
+        'err.Raise vbObjectError + 13, "Array must have more than 4 items"
+    Case players.Count = 4
+        matches.Add FormatMatch(players(1), players(2))
+        matches.Add FormatMatch(players(1), players(3))
+        matches.Add FormatMatch(players(2), players(4))
+        matches.Add FormatMatch(players(3), players(4))
+        matches.Add FormatMatch(players(3), players(2))
+        matches.Add FormatMatch(players(4), players(1))
+    Case (players.Count Mod 2) = 0 'Even >4
+        For i = 1 To players.Count
+            If (i - 1) Mod 2 = 0 Then 'Bottom Row, pull above and to the right
+                matches.Add FormatMatch(players.Item(i), players.Item((i Mod players.Count) + 1))
+                matches.Add FormatMatch(players.Item(i), players.Item(((i + 1) Mod players.Count) + 1))
+            Else 'TopRow, pull to the right
+                matches.Add FormatMatch(players.Item(i), players.Item(((i + 1) Mod players.Count) + 1))
             End If
         Next
-        
-        'If new match, add to colleciton and reduce both players by 1 point, removing them if zero to improve effeciency of macro
-        If Not matchExists Then
-            Debug.Print players.Count
-            match = Replace$(Replace$(MATCH_FORMAT, "<player1>", players.Keys(r1)), "<player2>", players.Keys(r2))
-            matches.Add match
-            matchSheet.Cells(matches.Count, "A").Value2 = match
-            Debug.Print "..added " & match
-            ReducePlayerDictionary players, _
-                players.Keys(r1), players.Items(r1) - 1, _
-                players.Keys(r2), players.Items(r2) - 1
-        End If
-        
-        DoEvents
-    Wend
+    Case (players.Count Mod 2) = 1 'Odd >4
+        For i = 1 To players.Count
+            If (i - 1) Mod 2 = 0 Then 'Bottom Row, pull above and to the right
+                matches.Add FormatMatch(players.Item(i), players.Item((i Mod players.Count) + 1))
+                matches.Add FormatMatch(players(i), players(((i + 1) Mod players.Count) + 1))
+            ElseIf (i + 1) < players.Count Then 'TopRow, pull to the right if we're not at the end
+                matches.Add FormatMatch(players.Item(i), players.Item(((i + 1) Mod players.Count) + 1))
+            End If
+        Next
+    End Select
+    
+    'Output Matches to sheet
+    Set matchSheet = GetSheet("Maand") 'Clears/creates a new sheet
+    For i = 1 To matches.Count
+        matchSheet.Range("A1").Offset(i - 1, 0).Value2 = matches(i)
+    Next
     
 End Sub
 
-Public Sub ReducePlayerDictionary(ByRef players As Scripting.Dictionary, ByVal key1 As String, ByVal val1 As Integer, ByVal key2 As String, ByVal val2 As Integer)
-    players.Remove key1
-    players.Remove key2
+Public Function FormatMatch(ByVal player1 As Variant, ByVal player2 As Variant) As Variant
+    FormatMatch = Replace(Replace(MATCH_FORMAT, "<player1>", player1), "<player2>", player2)
+End Function
+
+Public Sub RandomizeCollection(ByRef col As Collection)
+    Dim a() As Variant
+    Dim n() As Single
+    Dim i As Integer, j As Integer
+    Dim tmp As Variant, tmpS As Single
     
-    If val1 > 0 Then players.Add key1, val1
-    If val2 > 0 Then players.Add key2, val2
+    'Populate collection into Array
+    ReDim a(1 To col.Count) As Variant
+    For i = 1 To col.Count
+        a(i) = col(i)
+    Next
+    
+    'Generate list of random numbers
+    Randomize
+    ReDim n(1 To col.Count) As Single
+    For i = 1 To col.Count
+        n(i) = Rnd()
+    Next
+    
+    'Sort col by random numbers
+    For i = 1 To col.Count
+        For j = i + 1 To col.Count
+            If n(i) > n(j) Then
+                tmp = a(j)
+                a(j) = a(i)
+                a(i) = tmp
+            End If
+        Next
+    Next
+    
+    'Convert array back to collection
+    For i = col.Count To 1 Step -1
+        col.Remove i
+    Next
+    For i = LBound(a) To UBound(a)
+        col.Add a(i)
+    Next
 End Sub
+
+Public Function ExistsInCollection(ByRef col As Collection, ByVal key As String) As Boolean
+    On Error GoTo FuncError
+    ExistsInCollection = True
+    IsObject (col.Item(key))
+    Exit Function
+FuncError:
+    ExistsInCollection = False
+End Function
 
 Public Function GetSheet(ByVal sheetName As String) As Excel.Worksheet
     'Wipes/add and returns sheet
