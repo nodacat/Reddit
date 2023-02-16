@@ -47,8 +47,12 @@ Public Sub GenerateMatches()
             If (i - 1) Mod 2 = 0 Then 'Bottom Row, pull above and to the right
                 matches.Add FormatMatch(players.Item(i), players.Item((i Mod players.Count) + 1))
                 matches.Add FormatMatch(players(i), players(((i + 1) Mod players.Count) + 1))
-            ElseIf (i + 1) < players.Count Then 'TopRow, pull to the right if we're not at the end
-                matches.Add FormatMatch(players.Item(i), players.Item(((i + 1) Mod players.Count) + 1))
+            Else
+                If (i + 1) < players.Count Then 'TopRow, pull to the right if we're not at the end
+                    matches.Add FormatMatch(players.Item(i), players.Item(((i + 1) Mod players.Count) + 1))
+                Else 'bye
+                    matches.Add players.Item(i) & " - bye"
+                End If
             End If
         Next
     End Select
@@ -126,3 +130,4 @@ FuncError:
     ws.name = sheetName
     Set GetSheet = ws
 End Function
+
