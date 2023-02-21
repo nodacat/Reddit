@@ -4,11 +4,11 @@ Const MATCH_FORMAT As String = "<player1> vs <player2>"  'must include "<player1
 Public Sub GenerateMatches()
     Dim matchSheet As Excel.Worksheet
     Dim players As New Collection
-    Dim matches As New Collection
+    Dim matches(1 To 3) As New Collection '1:=Column, 2:=Bottom Row, 3:=Top Row
     Dim a As Variant
     Dim aStart As Long, aEnd As Long, aStep As Long
-    Dim i As Long, j As Long
-        
+    Dim i As Long, j As Long, k As Long
+    
     'Build player dictionary
     With Excel.ThisWorkbook.Worksheets("Deelnemers")
         For i = 1 To .Cells(.Rows.Count, "A").End(xlUp).Row
@@ -27,31 +27,31 @@ Public Sub GenerateMatches()
         'Error
         'err.Raise vbObjectError + 13, "Array must have more than 4 items"
     Case players.Count = 4
-        matches.Add FormatMatch(players(1), players(2))
-        matches.Add FormatMatch(players(1), players(3))
-        matches.Add FormatMatch(players(2), players(4))
-        matches.Add FormatMatch(players(3), players(4))
-        matches.Add FormatMatch(players(3), players(2))
-        matches.Add FormatMatch(players(4), players(1))
+        matches(1).Add FormatMatch(players(1), players(2))
+        matches(2).Add FormatMatch(players(1), players(3))
+        matches(3).Add FormatMatch(players(2), players(4))
+        matches(1).Add FormatMatch(players(3), players(4))
+        matches(2).Add FormatMatch(players(3), players(2))
+        matches(3).Add FormatMatch(players(4), players(1))
     Case (players.Count Mod 2) = 0 'Even >4
         For i = 1 To players.Count
             If (i - 1) Mod 2 = 0 Then 'Bottom Row, pull above and to the right
-                matches.Add FormatMatch(players.Item(i), players.Item((i Mod players.Count) + 1))
-                matches.Add FormatMatch(players.Item(i), players.Item(((i + 1) Mod players.Count) + 1))
+                matches(1).Add FormatMatch(players.Item(i), players.Item((i Mod players.Count) + 1))
+                matches(2).Add FormatMatch(players.Item(i), players.Item(((i + 1) Mod players.Count) + 1))
             Else 'TopRow, pull to the right
-                matches.Add FormatMatch(players.Item(i), players.Item(((i + 1) Mod players.Count) + 1))
+                matches(3).Add FormatMatch(players.Item(i), players.Item(((i + 1) Mod players.Count) + 1))
             End If
         Next
     Case (players.Count Mod 2) = 1 'Odd >4
         For i = 1 To players.Count
             If (i - 1) Mod 2 = 0 Then 'Bottom Row, pull above and to the right
-                matches.Add FormatMatch(players.Item(i), players.Item((i Mod players.Count) + 1))
-                matches.Add FormatMatch(players(i), players(((i + 1) Mod players.Count) + 1))
+                matches(1).Add FormatMatch(players.Item(i), players.Item((i Mod players.Count) + 1))
+                matches(2).Add FormatMatch(players(i), players(((i + 1) Mod players.Count) + 1))
             Else
                 If (i + 1) < players.Count Then 'TopRow, pull to the right if we're not at the end
-                    matches.Add FormatMatch(players.Item(i), players.Item(((i + 1) Mod players.Count) + 1))
+                    matches(3).Add FormatMatch(players.Item(i), players.Item(((i + 1) Mod players.Count) + 1))
                 Else 'bye
-                    matches.Add players.Item(i) & " - bye"
+                    matches(3).Add players.Item(i) & " - bye"
                 End If
             End If
         Next
@@ -59,10 +59,27 @@ Public Sub GenerateMatches()
     
     'Output Matches to sheet
     Set matchSheet = GetSheet("Maand") 'Clears/creates a new sheet
-    For i = 1 To matches.Count
-        matchSheet.Range("A1").Offset(i - 1, 0).Value2 = matches(i)
+    
+    'For evenly distributed matches...
+    ' - Output all column matches
+    j = 0
+    For i = 1 To matches(1).Count Step 1
+        matchSheet.Range("A1").Offset(j, 0).Value2 = matches(1)(i)
+        j = j + 1
     Next
     
+    ' - Output every other top/bottom match, alternating
+    For k = 1 To 2
+        For i = k To matches(2).Count Step 2
+            matchSheet.Range("A1").Offset(j, 0).Value2 = matches(2)(i)
+            j = j + 1
+        Next
+        For i = k To matches(3).Count Step 2
+            matchSheet.Range("A1").Offset(j, 0).Value2 = matches(3)(i)
+            j = j + 1
+        Next
+    Next
+
 End Sub
 
 Public Function FormatMatch(ByVal player1 As Variant, ByVal player2 As Variant) As Variant
@@ -130,4 +147,3 @@ FuncError:
     ws.name = sheetName
     Set GetSheet = ws
 End Function
-
