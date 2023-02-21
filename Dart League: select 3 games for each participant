@@ -25,7 +25,7 @@ Public Sub GenerateMatches()
     Select Case True
     Case players.Count < 4
         'Error
-        'err.Raise vbObjectError + 13, "Array must have more than 4 items"
+        err.Raise vbObjectError + 13, , "Array must have more than 4 items"
     Case players.Count = 4
         matches(1).Add FormatMatch(players(1), players(2))
         matches(2).Add FormatMatch(players(1), players(3))
