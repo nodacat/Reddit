@@ -74,7 +74,7 @@ Public Sub GenerateMatches()
     ReDim lastPlayedIndex(1 To players.Count) As Integer
     k = 0
     
-    While k < UBound(matches, 2) Or k > 100
+    While k < UBound(matches, 2)
         'start with a player, search for best match to play based on distance to last played
         matchScore = -1
         For i = 1 To players.Count
