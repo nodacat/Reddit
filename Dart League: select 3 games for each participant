@@ -5,8 +5,6 @@ Public Sub GenerateMatches()
     Dim matchSheet As Excel.Worksheet
     Dim players As New Collection
     Dim matches(1 To 3) As New Collection '1:=Column, 2:=Bottom Row, 3:=Top Row
-    Dim a As Variant
-    Dim aStart As Long, aEnd As Long, aStep As Long
     Dim i As Long, j As Long, k As Long
     
     'Build player dictionary
