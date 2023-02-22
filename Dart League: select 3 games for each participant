@@ -1,10 +1,11 @@
 'For https://www.reddit.com/r/excel/comments/1124xdz/dart_league_select_3_games_for_each_participant/
 Const MATCH_FORMAT As String = "<player1> vs <player2>"  'must include "<player1>" and "<player2>" somewhere
+Const BYE_FORMAT As String = "<player1> - Bye" 'must include "<playe1>" somewhere
 
 Public Sub GenerateMatches()
     Dim matchSheet As Excel.Worksheet
     Dim players As New Collection
-    Dim matches(1 To 3) As New Collection '1:=Column, 2:=Bottom Row, 3:=Top Row
+    Dim matches() As Integer
     Dim i As Long, j As Long, k As Long
     
     'Build player dictionary
@@ -25,63 +26,114 @@ Public Sub GenerateMatches()
         'Error
         err.Raise vbObjectError + 13, , "Array must have more than 4 items"
     Case players.Count = 4
-        matches(1).Add FormatMatch(players(1), players(2))
-        matches(2).Add FormatMatch(players(1), players(3))
-        matches(3).Add FormatMatch(players(2), players(4))
-        matches(1).Add FormatMatch(players(3), players(4))
-        matches(2).Add FormatMatch(players(3), players(2))
-        matches(3).Add FormatMatch(players(4), players(1))
+
+        AddMatch matches, 1, 2
+        AddMatch matches, 1, 3
+        AddMatch matches, 2, 4
+        AddMatch matches, 3, 4
+        AddMatch matches, 3, 2
+        AddMatch matches, 4, 1
+
     Case (players.Count Mod 2) = 0 'Even >4
         For i = 1 To players.Count
-            If (i - 1) Mod 2 = 0 Then 'Bottom Row, pull above and to the right
-                matches(1).Add FormatMatch(players.Item(i), players.Item((i Mod players.Count) + 1))
-                matches(2).Add FormatMatch(players.Item(i), players.Item(((i + 1) Mod players.Count) + 1))
-            Else 'TopRow, pull to the right
-                matches(3).Add FormatMatch(players.Item(i), players.Item(((i + 1) Mod players.Count) + 1))
+            If (i - 1) Mod 2 = 0 Then
+                'Bottom Row, pull above and to the right
+                AddMatch matches, i, (i Mod players.Count) + 1
+                AddMatch matches, i, ((i + 1) Mod players.Count) + 1
+            Else
+                'TopRow, pull to the right
+                AddMatch matches, i, ((i + 1) Mod players.Count) + 1
             End If
         Next
+        
     Case (players.Count Mod 2) = 1 'Odd >4
         For i = 1 To players.Count
-            If (i - 1) Mod 2 = 0 Then 'Bottom Row, pull above and to the right
-                matches(1).Add FormatMatch(players.Item(i), players.Item((i Mod players.Count) + 1))
-                matches(2).Add FormatMatch(players(i), players(((i + 1) Mod players.Count) + 1))
+            If (i - 1) Mod 2 = 0 Then
+                'Bottom Row, pull above and to the right
+                AddMatch matches, i, (i Mod players.Count) + 1
+                AddMatch matches, i, ((i + 1) Mod players.Count) + 1
             Else
-                If (i + 1) < players.Count Then 'TopRow, pull to the right if we're not at the end
-                    matches(3).Add FormatMatch(players.Item(i), players.Item(((i + 1) Mod players.Count) + 1))
-                Else 'bye
-                    matches(3).Add players.Item(i) & " - bye"
+                If (i + 1) < players.Count Then
+                    'TopRow, pull to the right if we're not at the end
+                    AddMatch matches, i, ((i + 1) Mod players.Count) + 1
+                Else 'bye (same person twice)
+                    AddMatch matches, i, i
                 End If
             End If
         Next
     End Select
     
-    'Output Matches to sheet
+    'Get/Create Sheet
     Set matchSheet = GetSheet("Maand") 'Clears/creates a new sheet
     
-    'For evenly distributed matches...
-    ' - Output all column matches
-    j = 0
-    For i = 1 To matches(1).Count Step 1
-        matchSheet.Range("A1").Offset(j, 0).Value2 = matches(1)(i)
-        j = j + 1
-    Next
+    'Distirbute matches evenly
+    Dim lastPlayedIndex() As Integer, alreadyMatched() As Boolean
+    Dim tmpMatchScore As Integer, matchScore As Integer, chosenMatch As Integer
     
-    ' - Output every other top/bottom match, alternating
-    For k = 1 To 2
-        For i = k To matches(2).Count Step 2
-            matchSheet.Range("A1").Offset(j, 0).Value2 = matches(2)(i)
-            j = j + 1
+    ReDim alreadyMatched(1 To UBound(matches, 2)) As Boolean
+    ReDim lastPlayedIndex(1 To players.Count) As Integer
+    k = 0
+    
+    While k < UBound(matches, 2) Or k > 100
+        'start with a player, search for best match to play based on distance to last played
+        matchScore = -1
+        For i = 1 To players.Count
+            For j = 1 To UBound(matches, 2)
+                'find match that hasn't already been listed and contains the current player
+                If Not alreadyMatched(j) And (matches(1, j) = i Or matches(2, j) = i) Then
+                    
+                    'check how long ago it was used
+                    tmpMatchScore = lastPlayedIndex(matches(1, j)) + lastPlayedIndex(matches(2, j)) ' - 2 * k
+                    If tmpMatchScore < matchScore Or matchScore = -1 Then
+                        matchScore = tmpMatchScore
+                        chosenMatch = j
+                    End If
+                    
+                End If
+            Next
         Next
-        For i = k To matches(3).Count Step 2
-            matchSheet.Range("A1").Offset(j, 0).Value2 = matches(3)(i)
-            j = j + 1
-        Next
-    Next
+        
+        'Output best match
+        matchSheet.Range("A1").Offset(k, 0).Value2 = FormatMatch(players(matches(1, chosenMatch)), players(matches(2, chosenMatch)))
+        lastPlayedIndex(matches(1, chosenMatch)) = k + 1
+        lastPlayedIndex(matches(2, chosenMatch)) = k + 1
+        alreadyMatched(chosenMatch) = True
+        k = k + 1
+    Wend
+    
 
 End Sub
 
+Public Sub AddMatch(ByRef matches() As Integer, ByVal intA As Integer, ByVal intB As Integer)
+    'Helper function to build 2d matches array and append to it like a collection
+    
+    'check bounds on array
+    Dim is2D As Boolean
+    On Error Resume Next
+    is2D = IsNumeric(UBound(matches, 2))
+    On Error GoTo 0
+    
+    'Declare or append to matches array
+    If IsEmpty(matches) Or Not is2D Then
+        ReDim matches(1 To 2, 1 To 1) As Integer
+        matches(1, 1) = intA
+        matches(2, 1) = intB
+    Else
+        Dim t As Integer
+        t = UBound(matches, 2) + 1
+        ReDim Preserve matches(1 To 2, 1 To t) As Integer
+        matches(1, t) = intA
+        matches(2, t) = intB
+    End If
+End Sub
+
 Public Function FormatMatch(ByVal player1 As Variant, ByVal player2 As Variant) As Variant
-    FormatMatch = Replace(Replace(MATCH_FORMAT, "<player1>", player1), "<player2>", player2)
+    If player1 = player2 Then
+        'we have a bye!
+        FormatMatch = Replace(BYE_FORMAT, "<player1>", player1)
+    Else
+        FormatMatch = Replace(Replace(MATCH_FORMAT, "<player1>", player1), "<player2>", player2)
+    End If
 End Function
 
 Public Sub RandomizeCollection(ByRef col As Collection)
