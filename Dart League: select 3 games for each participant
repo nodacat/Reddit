@@ -1,11 +1,15 @@
 'For https://www.reddit.com/r/excel/comments/1124xdz/dart_league_select_3_games_for_each_participant/
 Const MATCH_FORMAT As String = "<player1> vs <player2>"  'must include "<player1>" and "<player2>" somewhere
 Const BYE_FORMAT As String = "<player1> - Bye" 'must include "<playe1>" somewhere
+Const MAKEUP_FACTOR As Double = 0.7 'set somewhere between 0.5 and 1, to people with makeup games appear more frequently during dispursion (we want this)
 
 Public Sub GenerateMatches()
     Dim matchSheet As Excel.Worksheet
     Dim players As New Collection
+    Dim makeup_players As New Collection
     Dim matches() As Integer
+    Dim ogMatchesCount As Integer
+    Dim makeup_matches() As Integer
     Dim i As Long, j As Long, k As Long
     
     'Build player dictionary
@@ -13,13 +17,90 @@ Public Sub GenerateMatches()
         For i = 1 To .Cells(.Rows.Count, "A").End(xlUp).Row
             If Not ExistsInCollection(players, .Cells(i, "A").Value2) And .Cells(i, "A").Value2 <> "" Then
                 players.Add .Cells(i, "A").Value2
+                
+                If .Cells(i, "A").Font.Bold = True Then
+                    makeup_players.Add .Cells(i, "A").Value2
+                End If
             Else
                 'player already exists, maybe alert the user of the duplicate?
             End If
         Next
     End With
     RandomizeCollection players
+    BuildMatchesArray players, matches
+    ogMatchesCount = UBound(matches, 2)
     
+    'If we had make up games, append them to the match array
+    ' - independently create matches for makeup players, they play only each other
+    If makeup_players.Count > 0 Then
+        RandomizeCollection makeup_players
+        BuildMatchesArray makeup_players, makeup_matches
+    
+        'Append makupes to original match array
+        For i = LBound(makeup_matches, 2) To UBound(makeup_matches, 2)
+            j = IndexOfCollection(players, makeup_players(makeup_matches(1, i)))
+            k = IndexOfCollection(players, makeup_players(makeup_matches(2, i)))
+            AddMatch matches, j, k
+        Next
+    End If
+    
+    'Get/Create Sheet
+    Set matchSheet = GetSheet("Maand") 'Clears/creates a new sheet
+    
+    'Distirbute matches evenly
+    Dim lastPlayedIndex() As Integer, alreadyMatched() As Boolean
+    Dim tmpMatchScore As Double, matchScore As Double, chosenMatch As Integer
+    
+    ReDim alreadyMatched(1 To UBound(matches, 2)) As Boolean
+    ReDim lastPlayedIndex(1 To players.Count) As Integer
+    k = 0
+    
+    While k < UBound(matches, 2) Or k > 1000
+        'start with a player, search for best match to play based on distance to last played
+        matchScore = -1
+        For i = 1 To players.Count
+            For j = 1 To UBound(matches, 2)
+                'find match that hasn't already been listed and contains the current player
+                If Not alreadyMatched(j) And (matches(1, j) = i Or matches(2, j) = i) Then
+                    
+                    'check how long ago it was used
+                    ' - MAKEUP_FACTOR was intended to allow folks with makeup games to appear more frequently throughout the session, otherwise
+                    '   they would be all be pushed to the end (since other people haven't played as much as them).  Setting this less than one
+                    '   ex 0.7, makes it so they appear again sooner when determining a "chosenMatch"
+                    tmpMatchScore = lastPlayedIndex(matches(1, j)) * IIf(j > ogMatchesCount, MAKEUP_FACTOR, 1) + lastPlayedIndex(matches(2, j)) * IIf(j > ogMatchesCount, MAKEUP_FACTOR, 1)
+                    If tmpMatchScore < matchScore Or matchScore = -1 Then
+                        matchScore = tmpMatchScore
+                        chosenMatch = j
+                    End If
+                    
+                End If
+            Next
+        Next
+        
+        'Output best match
+        matchSheet.Range("A1").Offset(k, 0).Value2 = FormatMatch(players(matches(1, chosenMatch)), players(matches(2, chosenMatch))) & IIf(chosenMatch > ogMatchesCount, " (Makeup)", "")
+        lastPlayedIndex(matches(1, chosenMatch)) = k + 1
+        lastPlayedIndex(matches(2, chosenMatch)) = k + 1
+        alreadyMatched(chosenMatch) = True
+        k = k + 1
+    Wend
+    
+
+End Sub
+
+Public Function IndexOfCollection(ByRef col As Collection, ByVal item As Variant) As Integer
+    Dim i As Long
+    For i = 1 To col.Count
+        If col(i) = item Then
+            IndexOfCollection = i
+            Exit Function
+        End If
+    Next
+End Function
+
+Public Sub BuildMatchesArray(ByRef players As Collection, ByRef matches() As Integer)
+    Dim i As Integer
+
     'Iterate through players colleciton to build a chain of matches, output to match sheet
     Select Case True
     Case players.Count < 4
@@ -62,46 +143,6 @@ Public Sub GenerateMatches()
             End If
         Next
     End Select
-    
-    'Get/Create Sheet
-    Set matchSheet = GetSheet("Maand") 'Clears/creates a new sheet
-    
-    'Distirbute matches evenly
-    Dim lastPlayedIndex() As Integer, alreadyMatched() As Boolean
-    Dim tmpMatchScore As Integer, matchScore As Integer, chosenMatch As Integer
-    
-    ReDim alreadyMatched(1 To UBound(matches, 2)) As Boolean
-    ReDim lastPlayedIndex(1 To players.Count) As Integer
-    k = 0
-    
-    While k < UBound(matches, 2)
-        'start with a player, search for best match to play based on distance to last played
-        matchScore = -1
-        For i = 1 To players.Count
-            For j = 1 To UBound(matches, 2)
-                'find match that hasn't already been listed and contains the current player
-                If Not alreadyMatched(j) And (matches(1, j) = i Or matches(2, j) = i) Then
-                    
-                    'check how long ago it was used
-                    tmpMatchScore = lastPlayedIndex(matches(1, j)) + lastPlayedIndex(matches(2, j)) ' - 2 * k
-                    If tmpMatchScore < matchScore Or matchScore = -1 Then
-                        matchScore = tmpMatchScore
-                        chosenMatch = j
-                    End If
-                    
-                End If
-            Next
-        Next
-        
-        'Output best match
-        matchSheet.Range("A1").Offset(k, 0).Value2 = FormatMatch(players(matches(1, chosenMatch)), players(matches(2, chosenMatch)))
-        lastPlayedIndex(matches(1, chosenMatch)) = k + 1
-        lastPlayedIndex(matches(2, chosenMatch)) = k + 1
-        alreadyMatched(chosenMatch) = True
-        k = k + 1
-    Wend
-    
-
 End Sub
 
 Public Sub AddMatch(ByRef matches() As Integer, ByVal intA As Integer, ByVal intB As Integer)
@@ -178,7 +219,7 @@ End Sub
 Public Function ExistsInCollection(ByRef col As Collection, ByVal key As String) As Boolean
     On Error GoTo FuncError
     ExistsInCollection = True
-    IsObject (col.Item(key))
+    IsObject (col.item(key))
     Exit Function
 FuncError:
     ExistsInCollection = False
