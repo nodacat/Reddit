@@ -1,0 +1,66 @@
+'For https://www.reddit.com/r/vba/comments/13eu2j2/script_to_invert_the_colors_of_a_picture/
+Private Declare PtrSafe Function WaitMessage Lib "user32" () As Long
+
+Public Sub InvertAllPictures()
+    Dim pid As Long
+    Dim s As Long
+    Dim currSlide As PowerPoint.Slide
+    Dim currShape As PowerPoint.Shape
+    
+    'Open Paint
+    pid = Shell("mspaint", vbNormalFocus)
+    
+    'Loop through all shapes
+    For Each currSlide In ActivePresentation.Slides
+        'since we're deleting/replace, need to iterate in reverse
+        For s = currSlide.Shapes.Count To 1 Step -1
+            
+            'USER - change which shapes get modified here. By default we invert every picture
+            
+            'Invert and replace shape if it's of type msoPicture. Should ignore other shapes like textboxes
+            If currSlide.Shapes(s).Type = msoPicture Then
+            
+                InvertPicture currSlide.Shapes(s), currSlide, pid
+                
+            End If
+            
+        Next
+    Next
+    
+    'Close Paint
+    Shell "Taskkill /F /PID " & pid
+End Sub
+
+Public Sub InvertPicture(ByRef shp As Shape, ByRef s As Slide, ByRef pid As Long)
+    'USER - dial in your wait times here
+    
+    'Copy shape
+    shp.Copy
+    Wait 0.25
+    
+    AppActivate pid
+    SendKeys "^v", True
+    Wait 0.25
+    SendKeys "^+i", True
+    Wait 0.25
+    SendKeys "^c", True
+    Wait 0.25
+    
+    'Move shape to original shapes position
+    With s.Shapes.Paste
+        .Left = shp.Left
+        .Top = shp.Top
+    End With
+    
+    'Delete original shape
+    shp.Delete
+End Sub
+
+Public Sub Wait(ByVal seconds As Double)
+    Dim endtime As Double
+    endtime = DateTime.Timer + seconds
+    Do
+        WaitMessage
+        DoEvents
+    Loop While DateTime.Timer < endtime
+End Sub
