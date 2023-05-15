@@ -5,7 +5,6 @@ Public Sub InvertAllPictures()
     Dim pid As Long
     Dim s As Long
     Dim currSlide As PowerPoint.Slide
-    Dim currShape As PowerPoint.Shape
     
     'Open Paint
     pid = Shell("mspaint", vbNormalFocus)
