@@ -1,0 +1,71 @@
+Private Sub Lot_Blocks_Click()
+    
+    Dim wsA As Excel.Worksheet
+    Dim wsB As Excel.Worksheet
+    Dim ans As String
+    Dim i As Long, j As Long
+    Dim foundLotBlock As Boolean
+    
+    Dim A() As Variant 'Large array; CA Wip Master
+    Dim B() As Variant 'Small array; Directory
+    
+    With Excel.ThisWorkbook
+        Set wsA = Excel.Workbooks.Open(.Worksheets("PathSetup").Range("C2").Value2).Worksheets("CA Wip Master")
+        Set wsB = Excel.ThisWorkbook.Worksheets("Directory")
+    End With
+    
+    A = Application.Intersect(wsA.Range("A:D"), wsA.UsedRange).Value
+    B = wsB.Range("A:D").Cells.SpecialCells(xlCellTypeConstants).Value
+    ans = InputBox("Please input the date." & vbCrLf & "Example: 12/1/2017")
+    If ans = "" Then Exit Sub
+    
+    On Error GoTo CleanUp
+
+    'Disable app updates
+    With Excel.Application
+        .ScreenUpdating = False
+        .Calculation = xlCalculationManual
+    End With
+    
+    'Loop through arrays
+    For i = LBound(B, 1) To UBound(B, 1)
+        foundLotBlock = False
+        For j = LBound(A, 1) To UBound(A, 1)
+            If A(j, 1) = B(i, 1) Then
+                If A(j, 2) = B(i, 2) Then
+                    If A(j, 3) = B(i, 3) Then
+                        If A(j, 4) = ans Then
+                            foundLotBlock = True
+                            Exit For
+                        End If
+                    End If
+                End If
+            End If
+        Next
+        
+        If foundLotBlock Then
+            wsB.Cells(i, 5).Value2 = ""
+        Else
+            wsB.Cells(i, 5).Value2 = "Action Required."
+        End If
+    Next
+    
+CleanUp: 'Return to user
+    
+    'Reset app updates
+    With Excel.Application
+        .ScreenUpdating = True
+        .Calculation = xlCalculationAutomatic
+    End With
+    
+    'Check for errors
+    Select Case Err.Number
+    Case 0 'No Error
+        wsB.Activate
+        MsgBox "Check Complete!", vbOKOnly
+    Case Else
+        MsgBox "There was an error during search!" & vbNewLine & _
+            "  Number: " & CStr(Err.Number) & vbNewLine & _
+            "  Descirption: " & Err.Description
+    End Select
+End Sub
