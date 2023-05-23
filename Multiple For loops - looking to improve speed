@@ -1,3 +1,4 @@
+'For: https://www.reddit.com/r/vba/comments/13pdy02/multiple_for_loops_looking_to_improve_speed/
 Private Sub Lot_Blocks_Click()
     
     Dim wsA As Excel.Worksheet
