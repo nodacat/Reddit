@@ -7,7 +7,9 @@
 #   dictionary containing name/nc score pairs
 #   use this excel formula to help populate, example has Names in B7:B20 and NC Scores in C7:C20
 #   ="{"&TEXTJOIN(", ",TRUE,"'"&B7:B20&"' : "&C7:C20)&"}"
-people = {'Jackie':-3.13,'Jordan':-0.15,'Nick M.':5.35,'Craig':5.83,'Derek':6.62,'JP':7.00,'Nick J.':7.50,'Brandon P.':8.32,'Al':8.39,'John':11.23,'Erik':12.98,'Matt':14.80,'TJ':18.82}
+#   CAPTAINS: assign second parameter to team, example 'John':[4.5,1] would be assigned to team 1. 'John':[4.5,0] would be a free agent
+people = {'Jackie':[-3.13,0],'Jordan':[-0.15,0],'Nick M.':[5.35,0],'Craig':[5.83,0],'Derek':[6.62,0],'JP':[7.00,0],'Nick J.':[7.50,0],'Brandon P.':[8.32,0],'Al':[8.39,0],'John':[11.23,1],'Erik':[12.98,2],'Matt':[14.80,3],'TJ':[18.82,4]}
+
 #maximum time to return whatever the current best answer is
 maxWait = 4000 
 
@@ -15,8 +17,8 @@ maxWait = 4000
 #   this sets the number of teams you'd like to return, and evenly distributes the number of people into that group
 #   you can tweak these numbers to say split 6 people into 2 groups of 3 or 3 groups of 2 by changing the number in the 6th index, for example
 #   if people cant be distributed evenly in each groups, 'dummy' people are created to help balance (then removed later)
-#  numPeople : 0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 
-teamCount  = [ 0, 1, 2, 3, 2, 2, 2, 2, 2, 3, 3, 4, 3, 4, 4, 4, 4] #ex) for 16 people, we break into 4 teams
+#  numPeople :   0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 
+teamCount    = [ 0, 1, 2, 3, 2, 2, 2, 2, 2, 3, 3, 4, 3, 4, 4, 4, 4] #ex) for 16 people, we break into 4 teams
 
 #Dummy NC Score
 # when dummy people are needed to create even groupings, they'll take on this NC score
@@ -43,29 +45,36 @@ print("Creating " + str(dummyCount) + " dummy(s) with NC score of " + str(dummyN
 dummySet = set([f'DUMMY{i}' for i in range(dummyCount)])
 if dummyCount > 0:
 	for i in range(dummyCount):
-		people[list(dummySet)[i]] = dummyNCScore
+		people[list(dummySet)[i]] = [dummyNCScore,0]
 	numPeople = len(people)
 
 print("Preparing " + str(numTeams) + " teams of " + str(int(numPeople/numTeams)) + " people each...")
 
 #Get list of all possible combinations of people (teams)
-mean = sum(people.values()) / numPeople
+mean = sum(score[0] for score in people.values()) / numPeople
 people = dict(sorted(people.items(), key=lambda item: item[1]))
 teams = list(itertools.combinations(people.keys(), int(numPeople/numTeams)))
 teamScores = [0 for i in range(len(teams))]
 
 #Get variance to mean for each team combination
 for i in range(len(teams)):
-	teamScores[i] = abs(sum(people[person] - mean for person in teams[i]))
+	teamScores[i] = abs(sum(people[person][0] - mean for person in teams[i]))
 
 #Sort list to optimze search
 teams_sorted = [t for _, t in sorted(zip(teamScores,teams))]
 scores_sorted = [t for _, t in sorted(zip(teamScores,teamScores))]
 
+#Build captain sets
+captains = [set(), set(), set(), set()]
+for c in people:
+	if people[c][1] != 0:
+		#add to corrisponding team
+		captains[people[c][1]-1].add(c)
+
 #Reduce all team combinations to the best team with minimal difference
 totCombos = len(teams_sorted)
 tmpScore = 0
-minScore = max(people.values()) * numTeams
+minScore = max([p[0] for p in people.values()]) * numTeams
 minCombo = []
 timeOut = time.time() + maxWait
 
@@ -73,7 +82,7 @@ try:
 	#Check Team A Grouping
 	for a in range(totCombos):
 		sa = set(teams_sorted[a])
-		if (scores_sorted[a] < minScore) and (len((sa & dummySet)) <= maxDummiesPerTeam):
+		if (scores_sorted[a] < minScore) and (len((sa & dummySet)) <= maxDummiesPerTeam) and (captains[0].issubset(sa)):
 			if numTeams <= 1:
 				tmpScore = scores_sorted[a]
 				if tmpScore < minScore:
@@ -85,7 +94,7 @@ try:
 				#Check Team B Grouping
 				for b in range(a+1, totCombos):
 					sb = set(teams_sorted[b])
-					if not ((sb & sa)) and (scores_sorted[b] < minScore) and (len((sb & dummySet))<=maxDummiesPerTeam):
+					if not ((sb & sa)) and (scores_sorted[b] < minScore) and (len((sb & dummySet))<=maxDummiesPerTeam) and (captains[1].issubset(sb)):
 						if numTeams <= 2:
 							tmpScore = scores_sorted[a] + scores_sorted[b]
 							if tmpScore < minScore:
@@ -99,7 +108,7 @@ try:
 							#Check Team C Grouping
 							for c in range(b+1, totCombos):
 								sc = set(teams_sorted[c])
-								if not ((sc & sa) or (sc & sb)) and (scores_sorted[c] < minScore) and (len((sc & dummySet))<=maxDummiesPerTeam):
+								if not ((sc & sa) or (sc & sb)) and (scores_sorted[c] < minScore) and (len((sc & dummySet))<=maxDummiesPerTeam) and (captains[2].issubset(sc)):
 									if numTeams <= 3:
 										tmpScore = scores_sorted[a] + scores_sorted[b] + scores_sorted[c]
 										if tmpScore < minScore:
@@ -113,7 +122,7 @@ try:
 										#Check Team D Grouping
 										for d in range(c+1, totCombos):
 											sd = set(teams_sorted[d])
-											if not ((sd & sa) or (sd & sb) or (sd & sc)) and (scores_sorted[d] < minScore) and (len((sd & dummySet))<=maxDummiesPerTeam):
+											if not ((sd & sa) or (sd & sb) or (sd & sc)) and (scores_sorted[d] < minScore) and (len((sd & dummySet))<=maxDummiesPerTeam) and (captains[3].issubset(sd)):
 												if numTeams <= 4:
 													tmpScore = scores_sorted[a] + scores_sorted[b] + scores_sorted[c] + scores_sorted[d]
 													if tmpScore < minScore:
@@ -129,6 +138,7 @@ except LoopLeave:
 
 #Output results in Excel tab delimited format, sorted by NC, eliminate 'dummy' people
 print("[COPY TO EXCEL]:")
+print("Final Varince:",minScore)
 for i in range(len(minCombo)):
 	members = list(minCombo[i])
 
