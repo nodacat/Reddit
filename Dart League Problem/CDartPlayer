@@ -1,1 +1,30 @@
+Dim p_name As String
+Dim p_catchup As Boolean
+Dim p_lastgame As Single
 
+Public Property Get Name() As String
+    Name = p_name
+End Property
+Public Property Let Name(ByVal playerName As String)
+    p_name = playerName
+End Property
+
+Public Property Get Catchup() As Boolean
+    Catchup = p_catchup
+End Property
+Public Property Let Catchup(ByVal isCatchup As Boolean)
+    p_catchup = isCatchup
+End Property
+
+Public Property Get LastGamePlayed() As Single
+    LastGamePlayed = p_lastgame
+End Property
+Public Property Let LastGamePlayed(ByVal lastGame As Single)
+    p_lastgame = lastGame
+End Property
+
+Private Sub Class_Initialize()
+    Me.LastGamePlayed = -1
+    Me.Name = ""
+    Me.Catchup = False
+End Sub
