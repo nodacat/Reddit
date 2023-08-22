@@ -1,0 +1,45 @@
+Public Sub GenerateMatches()
+    Dim game As CDartGame
+    Dim matches() As String
+    Dim i As Long
+    Dim rngPlayers As Excel.Range
+    Dim rngMatches As Excel.Range
+    
+    '======================================================================
+    'Range Inputs and Outputs
+    With Excel.ThisWorkbook.Worksheets("Deelnemers")
+        Set rngPlayers = .Range("A1", .Cells(.Rows.Count, "A").End(xlUp))
+    End With
+    
+    'Set match output. Top cell only
+    Set rngMatches = Excel.ThisWorkbook.Worksheets("Maand").Range("A1")
+    '======================================================================
+    
+    'Create new game
+    Set game = New CDartGame
+    game.FormatBye = "<playerA> - BYE"
+    game.FormatVs = "<playerA> VS <playerB>"
+    game.AddPlayersFromRange rngPlayers
+
+    'On Error GoTo subError
+    With Excel.Application
+        .ScreenUpdating = False
+        .Calculation = xlCalculationManual
+    End With
+    
+    'Clear and load output
+    Range(rngMatches, rngMatches.End(xlDown)).ClearContents
+    matches = game.GetMatches()
+    For i = 0 To UBound(matches)
+        rngMatches.Offset(i, 0).Value2 = matches(i)
+    Next i
+    
+subError:
+    With Excel.Application
+        .ScreenUpdating = True
+        .Calculation = xlCalculationAutomatic
+    End With
+    If Err.Number > 0 Then Err.Raise Err.Number, , Err.Description
+    Debug.Print "DONE!"
+End Sub
+
