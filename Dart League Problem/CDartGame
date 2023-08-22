@@ -1,1 +1,466 @@
+Option Explicit
+Option Base 0
 
+Dim p_players() As CDartPlayer
+Dim p_regular() As Long
+Dim p_catchup() As Long
+Dim p_chain() As Long
+Dim p_matches() As Long
+Dim p_vs_format As String
+Dim p_bye_format As String
+
+
+Private Const MY_COUNT_ERROR As Integer = 12
+
+Public Property Let FormatVs(ByVal fmt As String)
+    p_vs_format = fmt
+End Property
+Public Property Let FormatBye(ByVal fmt As String)
+    p_bye_format = fmt
+End Property
+Public Property Get PlayerCount() As Long
+    PlayerCount = 0
+    If (Not Not p_players()) Then PlayerCount = UBound(p_players, 1) - LBound(p_players, 1) + 1
+End Property
+Public Property Get RegularCount() As Long
+    RegularCount = 0
+    If (Not Not p_regular()) Then RegularCount = UBound(p_regular, 1) - LBound(p_regular, 1) + 1
+End Property
+Public Property Get CatchupCount() As Long
+    CatchupCount = 0
+    If (Not Not p_catchup()) Then CatchupCount = UBound(p_catchup, 1) - LBound(p_catchup, 1) + 1
+End Property
+Public Property Get MatchCount() As Long
+    MatchCount = 0
+    If (Not Not p_matches()) Then MatchCount = UBound(p_matches, 2) - LBound(p_matches, 2) + 1
+End Property
+
+Private Sub Class_Initialize()
+    'Purpose:
+    ' - Runs at intialization of class automatically
+    p_vs_format = "<playerA> VS <playerB>"
+    p_bye_format = "<playerA> - BYE"
+    Call Reset
+End Sub
+
+Public Sub Reset()
+    'Purpose:
+    ' - can be called by class initalizer or by user if reseting game
+    Erase p_players
+    Erase p_regular
+    Erase p_catchup
+    Erase p_chain
+    Erase p_matches
+End Sub
+
+Public Function AddPlayer(ByVal Name As String, ByVal Catchup As Boolean) As Boolean
+    'Purpose:
+    ' - Adds player to p_player array and classifies it as a catchup or not
+    If Not PlayerExists(Name) And Name <> "" Then
+        Dim p As Long
+        p = Me.PlayerCount
+        ReDim Preserve p_players(0 To p) As CDartPlayer
+        Set p_players(p) = New CDartPlayer
+        With p_players(p)
+            .Name = Name
+            .Catchup = Catchup
+        End With
+    
+        If Catchup Then
+            ReDim Preserve p_catchup(0 To Me.CatchupCount) As Long
+            p_catchup(UBound(p_catchup, 1)) = p
+        Else
+            ReDim Preserve p_regular(0 To Me.RegularCount) As Long
+            p_regular(UBound(p_regular, 1)) = p
+        End If
+        AddPlayer = True
+    Else
+        'skipped adding player either empty or duplicate
+        AddPlayer = False
+    End If
+End Function
+
+Public Sub AddPlayersFromRange(ByVal rng As Excel.Range)
+    'Purpose:
+    ' - Adds multiple players from a range
+    ' - Skips any duplicates or empty values
+    Dim r As Excel.Range
+    Debug.Print "Adding players from range: " & rng.Address
+    For Each r In rng.Cells
+        If Not Me.AddPlayer(r.Value2, r.Font.Bold) Then
+            Debug.Print "Skipped " & r.Address & ", either duplicate or empty"
+        Else
+            'Debug.Print "Added " & r.Address & ", " & r.Value2
+        End If
+    Next r
+End Sub
+
+Public Function PlayerExists(ByVal playerName As String) As Boolean
+    'Purpose:
+    ' - checks if player is contained in the player array
+    On Error GoTo funcError
+    Dim i As Long
+    For i = LBound(p_players, 1) To UBound(p_players, 1)
+        If p_players(i).Name = playerName Then
+            PlayerExists = True
+            Exit Function
+        End If
+    Next i
+funcError:
+    PlayerExists = False
+End Function
+
+Private Sub RandomizeLongArray(ByRef a() As Long)
+    'Purpose:
+    ' - randomizes an array of long values. For use of sorting p_regular or p_catchup
+    ' - Expects 1-dimensional array
+    Dim sortBy() As Single
+    Dim i As Long, j As Long
+    Dim tmp_s As Single, tmp_a As Long
+    ReDim sortBy(LBound(a) To UBound(a)) As Single
+    
+    Randomize
+    For i = LBound(a, 1) To UBound(a, 1)
+        sortBy(i) = Rnd()
+    Next i
+    
+    For j = LBound(a, 1) To UBound(a, 1)
+        For i = j To UBound(a, 1)
+            If sortBy(j) < sortBy(i) Then
+                tmp_s = sortBy(j)
+                tmp_a = a(j)
+                sortBy(j) = sortBy(i)
+                a(j) = a(i)
+                sortBy(i) = tmp_s
+                a(i) = tmp_a
+            End If
+        Next i
+    Next j
+End Sub
+
+Private Sub ValidatePlayerCounts()
+    'Check if there are enough regular players
+    
+    Dim r As Long: r = Me.RegularCount
+    Dim c As Long: c = Me.CatchupCount
+    
+    Select Case c
+    Case 0, 3, 4
+        'oddly enough 0 and 3 take the same amount due to how the neighbors line up
+        If r < 4 Then
+            Err.Raise vbObjectError + MY_COUNT_ERROR, "CDartGame", "Not enough players. " & CStr(c + 4) & " players or more are needed for " & CStr(c) & " catchup players"
+            End
+        End If
+    Case 1, 2
+        'oddly enough 1 and 2 take the same amount due to how the neighbors line up
+        If r < 6 Then
+            Err.Raise vbObjectError + MY_COUNT_ERROR, "CDartGame", "Not enough players. 7 total players or more are needed for " & CStr(c) & " catchup players"
+            End
+        End If
+    Case Is > 4
+        'once we're past 4 catchup players, things get more regular
+        If r < c + 1 Then
+            Err.Raise vbObjectError + MY_COUNT_ERROR, "CDartGame", "Not enough players.  Must have " & CStr(c * 2 + 1) & " total players for " & CStr(c) & " catchup players"
+            End
+        End If
+    End Select
+    
+    Debug.Print "ValidatePlayerCounts() - success!"
+    
+End Sub
+
+Private Function FormatMatch(ByVal a As Long, ByVal b As String)
+    If b <> -1 Then
+        'use VS format
+        FormatMatch = Replace$(Replace$(p_vs_format, "<playerA>", p_players(a).Name), "<playerB>", p_players(b).Name)
+    Else
+        FormatMatch = Replace$(p_bye_format, "<playerA>", p_players(a).Name)
+    End If
+End Function
+
+Private Sub PopulateChain()
+    'Purpose:
+    ' - populates all regular and catchup players in a chain based on original concept laid out here
+    '   https://www.reddit.com/r/excel/comments/1124xdz/dart_league_select_3_games_for_each_participant/'
+    '
+    ' - Diagrams for chain.
+    '    - Note: matching relationships will be done later in GetMatches()
+    '
+    '   PlayerCount < 4
+    '    - to avoid duplicate matches, cross cross matches on last 2 people
+    '
+    '   1 - 3   1
+    '   |   | X
+    '   0 - 2   0
+    '
+    '   PlayerCount is Odd
+    '    - player 3 would be a bye
+    '    - player 4 will be paired with player 0 and 1
+    '
+    '   1 - 3       1
+    '   |   |     /
+    '   0 - 2 - 4 - 0
+    '
+    '   PlayerCount is Even
+    '
+    '   1 - 3 - 5 - 1
+    '   |   |   |
+    '   0 - 2 - 4 - 0
+    
+    Dim i As Long, r As Long, iMax As Long
+    Dim cCount As Long, c As Long
+    Dim pCount As Long, p As Long
+    
+    pCount = Me.PlayerCount
+    cCount = Me.CatchupCount
+    p = 0: c = 0: r = 0
+    ReDim p_chain(0 To cCount + pCount - 1) As Long
+    
+    'In a zig-zag fashion, disperse catchup players inbetween regular players in a way where there are no
+    ' duplicate neighbors
+    ' ex) if Willie, Irvin, Mitchell and Chelsea are all catchup players, list should look like this in the end
+    '   1:IRVIN   3:CHELSEA     5:WILLIE      7:Rayna   9:MITCHELL    11:Elian
+    '   0:WILLIE  2:MITCHELL    4:Esmeralda   6:IRVIN   8:Ingrid      10:CHELSEA
+    ' note: if you have 4 catchup players, you need at least 12 people
+    
+    'BUILD CHAIN
+    ' - Begin chain with catchup players
+    If cCount > 0 Then
+        For i = 0 To cCount - 1
+            p_chain(p) = p_catchup(i)
+            p = p + 1
+        Next
+    End If
+    
+    ' - Fill in regular players to we're at position 4 (zero based)
+    For i = p + 1 To IIf(p < 4, 4, p + (p Mod 2))
+        p_chain(p) = p_regular(r)
+        r = r + 1
+        p = p + 1
+    Next
+    
+    ' - Continue dispursing regular and catchup players in zig-zag fashion
+    iMax = (cCount + pCount - 1 - p)
+    For i = 0 To iMax
+        Select Case i Mod 4
+        Case 0, 3
+            p_chain(p) = p_regular(r)
+            r = r + 1
+        Case 1, 2
+            If c >= cCount Then
+                p_chain(p) = p_regular(r)
+                r = r + 1
+            Else
+                p_chain(p) = p_catchup(c)
+                c = c + 1
+            End If
+        End Select
+        p = p + 1
+    Next
+End Sub
+
+Private Sub DistributeMatches()
+    'Purpose:
+    ' - Distributes players evenly based on the last time each played
+    Dim m As Long
+    Dim minLpt As Single
+    Dim curLpt As Single
+    Dim i As Long
+    Dim c As Long
+    Dim tmp(0 To 1) As Long
+    
+    'O(n^2) Slow algo, but very small list to iterate on
+    For c = 0 To Me.MatchCount - 1
+        minLpt = CSng(Me.MatchCount) 'start high
+        For m = c To Me.MatchCount - 1
+            If p_matches(1, m) = -1 Then
+                'If match is a bye, fast track to top of list
+                i = m
+                Exit For
+            Else
+                'Calculate current last play time based on total lpt of players
+                ' - take into account if they are catchup players need to appear more frequently, or 2x more often
+                curLpt = p_players(p_matches(0, m)).LastGamePlayed / IIf(p_players(p_matches(0, m)).Catchup, 2, 1) _
+                       + p_players(p_matches(1, m)).LastGamePlayed / IIf(p_players(p_matches(1, m)).Catchup, 2, 1)
+                If curLpt <= minLpt Then
+                    'Found a new local minimum, record and keep checking
+                    minLpt = curLpt
+                    i = m
+                End If
+            End If
+        Next m
+        
+        'Update each players LPT if not bye
+        If p_matches(1, i) <> -1 Then
+            p_players(p_matches(0, i)).LastGamePlayed = c
+            p_players(p_matches(1, i)).LastGamePlayed = c
+            
+            'Debug.Print FormatMatch(p_matches(0, i), p_matches(1, i)), curLpt
+        End If
+        
+        If i > c Then
+            'At this point mIndex should be populated with he minimum lpt, swap with current item
+            tmp(0) = p_matches(0, c)
+            p_matches(0, c) = p_matches(0, i)
+            p_matches(0, i) = tmp(0)
+            tmp(1) = p_matches(1, c)
+            p_matches(1, c) = p_matches(1, i)
+            p_matches(1, i) = tmp(1)
+        ElseIf i = c Then
+            'No swap needed
+        Else
+            'Shoudl be impossible
+            Debug.Print "Impossible!"
+        End If
+    Next
+    
+End Sub
+
+
+Public Function GetMatches(Optional ByVal sortRandom As Boolean = True) As String()
+    
+    'Purpose:
+    ' - Returns player vs player matches as string
+    
+    'Parameters:
+    ' - sortRandom
+    '    - if true, sorts all players randomly before matcing
+    '    - if false, players are matched in the order they were originally added (helps for debugging)
+    
+    'ToDo:
+    ' - Ensure there are enough regular vs catchup players
+    ' - Randomize lists
+    ' - Create matches
+    ' - Distribute matches evenly so every plays at a similar frequency.
+    '    - Catcup players play more frequent
+    ' - Outpt player vs player matchs a strring
+    
+    Call ValidatePlayerCounts
+     
+    If sortRandom Then
+        If Me.CatchupCount > 0 Then RandomizeLongArray p_catchup
+        RandomizeLongArray p_regular 'Me.RegularCount must be >0 already via ValidatePlayerCounts
+    End If
+    
+    Call PopulateChain
+    
+    'Now that we have the chain, it's just a matter of outputing into the selected format.
+    Dim hCount As Long
+    Dim i As Long, m As Long
+    Dim rtn() As String
+    hCount = UBound(p_chain, 1) - LBound(p_chain, 1) + 1
+    i = 0
+    Select Case True
+    Case hCount < 4
+        'Impossible
+    Case hCount = 4
+        'Criss-cross final values
+        ReDim p_matches(0 To 1, 0 To 5) As Long
+        p_matches(0, 0) = p_chain(0)
+        p_matches(1, 0) = p_chain(1)
+        p_matches(0, 1) = p_chain(0)
+        p_matches(1, 1) = p_chain(2)
+        p_matches(0, 2) = p_chain(1)
+        p_matches(1, 2) = p_chain(3)
+        p_matches(0, 3) = p_chain(2)
+        p_matches(1, 3) = p_chain(3)
+        p_matches(0, 4) = p_chain(2)
+        p_matches(1, 4) = p_chain(1)
+        p_matches(0, 5) = p_chain(3)
+        p_matches(1, 5) = p_chain(0)
+        
+    Case hCount Mod 2 = 0
+        'Even Count : inline loop-back final values
+        m = -1
+        For i = 0 To hCount - 1
+            If i Mod 2 = 0 Then
+                'Even Index Case
+                ReDim Preserve p_matches(0 To 1, 0 To m + 2) As Long
+                p_matches(0, m + 1) = p_chain(i)
+                p_matches(1, m + 1) = p_chain((i + 1) Mod hCount)
+                p_matches(0, m + 2) = p_chain(i)
+                p_matches(1, m + 2) = p_chain((i + 2) Mod hCount)
+                m = m + 2
+            Else
+                'Odd Index Case
+                ReDim Preserve p_matches(0 To 1, 0 To m + 1) As Long
+                p_matches(0, m + 1) = p_chain(i)
+                p_matches(1, m + 1) = p_chain((i + 2) Mod hCount)
+                m = m + 1
+            End If
+            
+        Next
+    
+    Case hCount Mod 2 = 1
+        'Odd Count: share last value
+        m = -1
+        For i = 0 To hCount - 1
+            Select Case i
+            Case hCount - 1
+                'If last item, loop back to start normally
+                ReDim Preserve p_matches(0 To 1, 0 To m + 2) As Long
+                p_matches(0, m + 1) = p_chain(i)
+                p_matches(1, m + 1) = p_chain((i + 1) Mod hCount)
+                p_matches(0, m + 2) = p_chain(i)
+                p_matches(1, m + 2) = p_chain((i + 2) Mod hCount)
+                m = m + 2
+            Case hCount - 2
+                'Second to last with odd chain count is a BYE
+                ReDim Preserve p_matches(0 To 1, 0 To m + 1) As Long
+                p_matches(0, m + 1) = p_chain(i)
+                p_matches(1, m + 1) = -1
+                m = m + 1
+            Case Else
+                If i Mod 2 = 0 Then
+                    'Even Index Case
+                    ReDim Preserve p_matches(0 To 1, 0 To m + 2) As Long
+                    p_matches(0, m + 1) = p_chain(i)
+                    p_matches(1, m + 1) = p_chain((i + 1) Mod hCount)
+                    p_matches(0, m + 2) = p_chain(i)
+                    p_matches(1, m + 2) = p_chain((i + 2) Mod hCount)
+                    m = m + 2
+                Else
+                    'Odd Index Case
+                    ReDim Preserve p_matches(0 To 1, 0 To m + 1) As Long
+                    p_matches(0, m + 1) = p_chain(i)
+                    p_matches(1, m + 1) = p_chain((i + 2) Mod hCount)
+                    m = m + 1
+                End If
+            End Select
+        Next
+    End Select
+    
+    Call DistributeMatches
+    
+    'Convert p_matches to string and return
+    ReDim rtn(0 To UBound(p_matches, 2)) As String
+    For m = 0 To UBound(p_matches, 2)
+        rtn(m) = FormatMatch(p_matches(0, m), p_matches(1, m))
+    Next
+    
+    GetMatches = rtn
+    
+End Function
+
+Public Function GetChain() As String()
+    Dim rtn() As String
+    Dim i As Long
+    
+    If (Not Not p_chain) Then
+        ReDim rtn(0 To UBound(p_chain)) As String
+        For i = 0 To UBound(p_chain)
+            rtn(i) = p_players(p_chain(i)).Name
+        Next
+        GetChain = rtn
+        
+    Else
+        Call GetMatches
+        If (Not Not p_chain) Then
+            ReDim rtn(0 To UBound(p_chain)) As String
+            For i = 0 To UBound(p_chain)
+                rtn(i) = p_players(p_chain(i)).Name
+            Next
+        End If
+        GetChain = rtn
+    End If
+End Function
