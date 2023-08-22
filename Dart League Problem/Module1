@@ -1,3 +1,5 @@
+'Module
+
 Public Sub GenerateMatches()
     Dim game As CDartGame
     Dim matches() As String
