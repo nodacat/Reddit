@@ -1,3 +1,4 @@
+'Class Object
 Dim p_name As String
 Dim p_catchup As Boolean
 Dim p_lastgame As Single
