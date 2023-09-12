@@ -8,7 +8,7 @@
 #   use this excel formula to help populate, example has Names in B7:B20 and NC Scores in C7:C20
 #   ="{"&TEXTJOIN(", ",TRUE,"'"&B7:B20&"' : "&C7:C20)&"}"
 #   CAPTAINS: assign second parameter to team, example 'John':[4.5,1] would be assigned to team 1. 'John':[4.5,0] would be a free agent
-people = {'Jackie':[-3.13,0],'Jordan':[-0.15,0],'Nick M.':[5.35,0],'Craig':[5.83,0],'Derek':[6.62,0],'JP':[7.00,0],'Nick J.':[7.50,0],'Brandon P.':[8.32,0],'Al':[8.39,0],'John':[11.23,1],'Erik':[12.98,2],'Matt':[14.80,3],'TJ':[18.82,4]}
+people = {'Rish':[-2.67,0],'Jordan S.':[-0.02,4],'Tavaris':[0.81,0],'Cisco':[1.00,0],'Craig':[2.79,0],'JP':[2.90,3],'Brandon P.':[3.09,3],'John P.':[4.39,0],'Nick M.':[4.98,2],'Matt':[6.67,4],'Peter P.':[8.49,0],'Billy':[9.13,1],'Kyle R.':[9.14,1],'Nick J.':[12.71,0],'Dom':[13.36,0],'TJ':[14.68,2]}
 
 #maximum time to return whatever the current best answer is
 maxWait = 4000 
@@ -92,7 +92,7 @@ try:
 			else:
 
 				#Check Team B Grouping
-				for b in range(a+1, totCombos):
+				for b in range(totCombos):
 					sb = set(teams_sorted[b])
 					if not ((sb & sa)) and (scores_sorted[b] < minScore) and (len((sb & dummySet))<=maxDummiesPerTeam) and (captains[1].issubset(sb)):
 						if numTeams <= 2:
@@ -106,7 +106,7 @@ try:
 						else:
 
 							#Check Team C Grouping
-							for c in range(b+1, totCombos):
+							for c in range(totCombos):
 								sc = set(teams_sorted[c])
 								if not ((sc & sa) or (sc & sb)) and (scores_sorted[c] < minScore) and (len((sc & dummySet))<=maxDummiesPerTeam) and (captains[2].issubset(sc)):
 									if numTeams <= 3:
@@ -120,7 +120,7 @@ try:
 									else:
 
 										#Check Team D Grouping
-										for d in range(c+1, totCombos):
+										for d in range(totCombos):
 											sd = set(teams_sorted[d])
 											if not ((sd & sa) or (sd & sb) or (sd & sc)) and (scores_sorted[d] < minScore) and (len((sd & dummySet))<=maxDummiesPerTeam) and (captains[3].issubset(sd)):
 												if numTeams <= 4:
