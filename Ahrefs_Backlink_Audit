@@ -1,0 +1,345 @@
+//For: https://www.reddit.com/r/vba/comments/16mv5om/how_to_optimise_this_vba_to_not_crash_excel/
+Public Sub Ahrefs_Backlink_Audit()
+    ' Declare variables to hold the current name and new name of the workbook
+    Dim currentName As String
+    
+    Dim date_string As String
+    Dim website As String
+    Dim columnName As Variant
+    Dim columnIndex As Long
+    Dim lastRow As Long
+    Dim i As Long
+    
+    Dim wb As Excel.Worksheet 'Active Workbook
+    Dim wsAhrefs As Excel.Worksheet
+    Dim wsDomains As Excel.Worksheet
+    Dim wsReferred As Excel.Worksheet
+    Dim wsTopTarget As Excel.Worksheet
+    Dim wsLostLinks As Excel.Worksheet
+    Dim wsLostDomains As Excel.Worksheet
+    
+    Dim headerRange As Excel.Range
+    Dim headerValues As Variant
+    Dim auditDate As Date
+    Dim isFound As Boolean
+    Dim cell As Excel.Range
+    
+    Set wb = ActiveWorkbook
+
+    ' Get the current date in the format "yyyy-mm-dd"
+    date_string = Format(Now, "yyyy-mm-dd")
+    
+    ' Assign the current name of the active workbook to the variable
+    currentName = wb.name
+    If Left(currentName, 4) = "www." Then
+        website = Mid(currentName, InStr(currentName, "www.") + 4, InStr(InStr(currentName, "www.") + 4, currentName, ".c") - InStr(currentName, "www.") - 4)
+    Else
+        'TO DO: What happens when current Name doesn't have "www." ??
+    End If
+
+    ' Change the name of the active workbook to the new name
+    wb.SaveAs Filename:=date_string & "_" & website & "_Audit.csv"
+    
+    
+    'CREATE :: AHREFS BACKLINK AUDIT ======================================================================
+    Set wsAhrefs = wb.ActiveSheet 'Gets activesheet intead of creating a sheet
+    With wsAhrefs
+        
+        ' Rename the current sheet to Ahrefs_Backlink_Audit
+        .name = "Ahrefs_Backlink_Audit"
+        
+        ' Delete the specified columns
+        For Each columnName In Array("Language", "Platform", "Referring page HTTP code", "Domain traffic", "Referring domains", "Linked domains", "External links", "Page traffic", "Keywords", "Left context", "Right context", "Rendered", "Raw", "Lost status", "Drop reason", "Discovered status", "Author")
+            columnIndex = Application.Match(columnName, .Rows(1), 0)
+        
+            ' Delete the column if it was found
+            If Not IsError(columnIndex) Then .Columns(columnIndex).Delete Shift:=xlToLeft
+        Next
+        
+        ' Add the term "Referring Domain" to cell O1
+        .Range("O1").Value = "Referring Domain"
+        
+        ' Add the formula to cell O2
+        .Range("O2").Formula = "=MID(B2,FIND(""//"",B2)+2,FIND(""/"",B2,FIND(""//"",B2)+2)-FIND(""//"",B2)-2)"
+        
+        ' Copy the formula down the column if the corresponding cell in Column A is not empty
+        lastRow = .Cells(Rows.Count, "A").End(xlUp).Row
+        .Range("O2:O" & lastRow).FillDown
+        
+        ' Add the term "ccTLD" to cell P1
+        .Range("P1").Value = "ccTLD"
+        
+        ' Add the formula to cell P2
+        .Range("P2").Formula = "=RIGHT(O2,LEN(O2)-FIND(""*"",SUBSTITUTE(O2,""."",""*"",LEN(O2)-LEN(SUBSTITUTE(O2,""."","""")))))"
+        
+        ' Copy the formula down the column if the corresponding cell in Column A is not empty
+        .Range("P2:P" & lastRow).FillDown
+        
+        ' Remove "http://" and "https://" from column E
+        .Columns("E").Replace "http://", "", xlPart
+        .Columns("E").Replace "https://", "", xlPart
+        
+        ' Convert values in column L, M, and N to date values
+        For i = 2 To lastRow
+            If InStr(.Cells(i, "L").Value, " ") > 0 Then
+                .Cells(i, "L").Value = DateValue(Left(.Cells(i, "L").Value, InStr(.Cells(i, "L").Value, " ") - 1))
+            End If
+            
+            If InStr(ws.Cells(i, "M").Value, " ") > 0 Then
+                .Cells(i, "M").Value = Left(.Cells(i, "M").Value, InStr(.Cells(i, "M").Value, " ") - 1)
+            End If
+        
+            If InStr(ws.Cells(i, "N").Value, " ") > 0 Then
+                .Cells(i, "N").Value = Left(.Cells(i, "N").Value, InStr(.Cells(i, "N").Value, " ") - 1)
+            End If
+        Next i
+        
+        ' Convert values in column I to Follow/NoFollow
+        lastRow = .Cells(Rows.Count, "H").End(xlUp).Row
+        For i = 2 To lastRow
+            If UCase(.Cells(i, "I").Value) = "FALSE" Then
+                .Cells(i, "I").Value = "Follow"
+            ElseIf UCase(ws.Cells(i, "I").Value) = "TRUE" Then
+                .Cells(i, "I").Value = "NoFollow"
+            End If
+        Next i
+        
+    End With 'AHREFS ======================================================================
+    
+    
+    'CREATE :: UNIQUE REFERRING DOMAINS ======================================================================
+    
+    Set wsDomains = GetSheet("unique_referring_domains", ThisWorkbook) 'Creates/Gets Sheet by name
+    With wsDomains
+        ' Define the last row in the "Ahrefs_Backlink_Audit" sheet
+        lastRow = wsAhrefs.Cells(Rows.Count, "B").End(xlUp).Row
+        
+        ' Set the formulas in the range A2:G2
+        .Range("A1:G1").Value = Array("referring_domain", "Domain Rating", "# Links", "# Follow", "# NoFollow", "# USG", "# Sponsored")
+        .Range("A2:A" & lastRow).Formula = "=IF(ISERROR(FIND(""//www."", Ahrefs_Backlink_Audit!B2)), MID(Ahrefs_Backlink_Audit!B2, FIND("":"", Ahrefs_Backlink_Audit!B2, 4)+3, FIND(""/"", Ahrefs_Backlink_Audit!B2, 9)-FIND("":"", Ahrefs_Backlink_Audit!B2, 4)-3), MID(Ahrefs_Backlink_Audit!B2, FIND("":"", Ahrefs_Backlink_Audit!B2, 4)+7, FIND(""/"", Ahrefs_Backlink_Audit!B2, 9)-FIND("":"", Ahrefs_Backlink_Audit!B2, 4)-7))"
+        .Range("B2:B" & lastRow).Formula = "=Ahrefs_Backlink_Audit!C2"
+        .Range("C2:C" & lastRow).Formula = "=COUNTIF(Ahrefs_Backlink_Audit!O:O, A2)"
+        .Range("D2:D" & lastRow).Formula = "=COUNTIFS(Ahrefs_Backlink_Audit!O:O, A2, Ahrefs_Backlink_Audit!I:I, ""Follow"")"
+        .Range("E2:E" & lastRow).Formula = "=COUNTIFS(Ahrefs_Backlink_Audit!O:O, A2, Ahrefs_Backlink_Audit!I:I, ""NoFollow"")"
+        .Range("F2:F" & lastRow).Formula = "=COUNTIFS(Ahrefs_Backlink_Audit!O:O, A2, Ahrefs_Backlink_Audit!J:J, ""TRUE"")"
+        .Range("G2:G" & lastRow).Formula = "=COUNTIFS(Ahrefs_Backlink_Audit!O:O, A2, Ahrefs_Backlink_Audit!K:K, ""TRUE"")"
+        
+        ' Check if column A is not empty
+        If Application.CountA(.Range("A:A")) > 0 Then
+            ' Drag the formulas down the column
+            .Range("A2:G" & lastRow).FillDown
+        End If
+    
+        ' Copy values from column N in the "Ahrefs_Backlink_Audit" sheet to column H in the "unique_referring_domains" sheet
+        wsAhrefs.Range("N:N").Copy Destination:=.Range("H1")
+    
+        ' Delete all rows where column H is not empty, starting from row 2
+        lastRow = .Cells(.Rows.Count, "H").End(xlUp).Row
+        If lastRow > 1 Then
+            .Range("H2:H" & lastRow).SpecialCells(xlCellTypeConstants).EntireRow.Delete
+        End If
+        
+    End With 'UNIQUE REFERRING DOMAINS
+    
+    
+    'CREATE :: TOP REFERRED PAGES ======================================================================
+    
+    Set wsReferred = GetSheet("Top_Referred_Pages", ThisWorkbook) 'Creates/Gets Sheet by name
+    With wsReferred
+        ' Set the header values in one go
+        .Range("A1:H1").Value = Array("Referring Page Title", "Referring Page URL", "UR", "# Links", "# Follow", "# No Follow", "UGC", "Sponsored")
+    
+        ' Find the last row of data in the "Ahrefs_Backlink_Audit" sheet
+        lastRow = wsAhrefs.Cells(sourceWs.Rows.Count, "A").End(xlUp).Row
+    
+        ' Copy values from column A to column A, column B to column B, and column C to column C of the "Top_Referred_Pages" sheet
+        wsAhrefs.Range("A2:C" & lastRow).Copy .Range("A2")
+    
+        ' Remove duplicates in column B and apply changes to the corresponding cells in the row
+        .Range("A1:C" & lastRow).RemoveDuplicates Columns:=2, Header:=xlYes
+    
+        ' Find the last row in column A
+        lastRow = .Cells(.Rows.Count, "A").End(xlUp).Row
+        If lastRow = 1 Then lastRow = 2 'Column A must be empty if lastrow = 1, set to 2
+    
+        ' Add formulas to cells D2:H2
+        .Range("D2:D" & CStr(lastRow)).Formula = "=COUNTIFS(Ahrefs_Backlink_Audit!B:B, B2, Ahrefs_Backlink_Audit!N:N,"""")"
+        .Range("E2:E" & CStr(lastRow)).Formula = "=COUNTIFS(Ahrefs_Backlink_Audit!B:B, B2, Ahrefs_Backlink_Audit!I:I, ""Follow"", Ahrefs_Backlink_Audit!N:N,"""")"
+        .Range("F2:F" & CStr(lastRow)).Formula = "=COUNTIFS(Ahrefs_Backlink_Audit!B:B, B2, Ahrefs_Backlink_Audit!I:I, ""NoFollow"", Ahrefs_Backlink_Audit!N:N,"""")"
+        .Range("G2:G" & CStr(lastRow)).Formula = "=COUNTIFS(Ahrefs_Backlink_Audit!B:B, B2, Ahrefs_Backlink_Audit!J:J, ""TRUE"", Ahrefs_Backlink_Audit!N:N,"""")"
+        .Range("H2:H" & CStr(lastRow)).Formula = "=COUNTIFS(Ahrefs_Backlink_Audit!B:B, B2, Ahrefs_Backlink_Audit!K:K, ""TRUE"", Ahrefs_Backlink_Audit!N:N,"""")"
+    
+    End With 'TOP REFERRED PAGES ======================================================================
+    
+    
+    'CREATE :: TOP TARGET PAGES ======================================================================
+    
+    Set wsTopTarget = GetSheet("Top_Target_Pages", ThisWorkbook) 'Creates/Gets Sheet by name
+    With wsTopTarget
+    
+        ' Set the header values in one go
+        .Range("A1:G1").Value = Array("Referring Page URL", "# Links", "# Follow", "# No Follow", "USG", "Sponsored", "Type")
+
+        ' find the last row of data in the "Ahrefs_Backlink_Audit" sheet
+        lastRow = wsAhrefs.Cells(wsAhrefs.Rows.Count, "A").End(xlUp).Row
+
+        ' copy values from column B of the "Ahrefs_Backlink_Audit" sheet to column A of the "Top_Referred_Pages" sheet
+        .Range("A2").Formula = "=Ahrefs_Backlink_Audit!E2"
+        .Range("A2").AutoFill Destination:=ws.Range("A2:A" & lastRow), Type:=xlFillDefault
+
+        ' remove duplicates in column A and apply changes to the corresponding cells in the row
+        .Range("A2:A" & lastRow).RemoveDuplicates Columns:=1, Header:=xlNo
+        
+        ' check if column A is not empty
+        lastRow = .Cells(Rows.Count, "A").End(xlUp).Row
+        If lastRow = 1 Then lastRow = 2
+        
+        ' Add formulas to cells B2:F2
+        .Range("B2:B" & CStr(lastRow)).Formula = "=COUNTIFS(Ahrefs_Backlink_Audit!E:E, A2, Ahrefs_Backlink_Audit!N:N, """")"
+        .Range("C2:C" & CStr(lastRow)).Formula = "=COUNTIFS(Ahrefs_Backlink_Audit!E:E, A2, Ahrefs_Backlink_Audit!I:I, ""Follow"", Ahrefs_Backlink_Audit!N:N, """")"
+        .Range("D2:D" & CStr(lastRow)).Formula = "=COUNTIFS(Ahrefs_Backlink_Audit!E:E, A2, Ahrefs_Backlink_Audit!I:I, ""NoFollow"", Ahrefs_Backlink_Audit!N:N, """")"
+        .Range("E2:E" & CStr(lastRow)).Formula = "=COUNTIFS(Ahrefs_Backlink_Audit!E:E, A3, Ahrefs_Backlink_Audit!J:J, ""TRUE"", Ahrefs_Backlink_Audit!N:N, """")"
+        .Range("F2:F" & CStr(lastRow)).Formula = "=COUNTIFS(Ahrefs_Backlink_Audit!E:E, A3, Ahrefs_Backlink_Audit!K:K, ""TRUE"", Ahrefs_Backlink_Audit!N:N, """")"
+        
+    End With 'TOP TARGET PAGES ======================================================================
+    
+
+    'CREATE :: NEW LOST LINKS ======================================================================
+    
+    Set wsLostLinks = GetSheet(New_Lost_Links, thiswokbook) 'Creates/Gets Sheet by name
+    With wsLostLinks
+    
+        'Set headers
+        .Range("A1:F1").Value = Array("Referring Page", "Target Page", "Domain Rating", "Date", "Lost/Found", "Type")
+        
+        'Find last row of New_Lost_Links sheet
+        lastRow = .Cells(.Rows.Count, "A").End(xlUp).Row
+        
+        'Loop through Ahrefs_Backlink_Audit sheet and copy values to New_Lost_Links sheet
+        For i = 2 To wsAhrefs.Cells(wsAhrefs.Rows.Count, "B").End(xlUp).Row
+            isFound = Not IsEmpty(wsAhrefs.Range("N" & i).Value)
+            auditDate = IIf(isFound, wsAhrefs.Range("N" & i).Value, wsAhrefs.Range("L" & i).Value)
+            
+            If auditDate >= DateAdd("yyyy", -1, Date) Then
+                lastRow = lastRow + 1
+                .Range("A" & lastRow).Value = wsAhrefs.Range("B" & i).Value
+                .Range("B" & lastRow).Value = wsAhrefs.Range("E" & i).Value
+                .Range("C" & lastRow).Value = wsAhrefs.Range("C" & i).Value
+                .Range("D" & lastRow).Value = auditDate
+                
+                .Range("E" & lastRow).Value = IIf(isFound, "Found", "Lost")
+                .Range("F" & lastRow).Value = IIf(isFound, 1, -1)
+            End If
+        Next i
+    End With 'NEW LOST LINKS ======================================================================
+    
+    
+    'CREATE :: NEW LOST DOMAINS ======================================================================
+    
+    Set wsLostDomains = GetSheet("New_Lost_Domains") 'Creates/Gets Sheet by name
+    With wsLostDomains
+    
+        Dim domain As String
+        Dim domainRating As Double
+        Dim foundDate As Date
+        Dim status As String
+        Dim foundBacklinks As Long
+        Dim lostBacklinks As Long
+        Dim domainStatus As String
+        Dim myValue As Long
+            
+        ' Get the last row of data
+        lastRow = wsLostLinks.Cells(wsLostLinks.Rows.Count, "A").End(xlUp).Row
+        
+        ' Loop through each row of data
+        For i = 2 To lastRow
+            domain = GetDomain(wsLostLinks.Cells(i, 1).Value)
+            domainRating = wsLostLinks.Cells(i, 3).Value
+            foundDate = wsLostLinks.Cells(i, 4).Value
+            myValue = CLng(wsLostLinks.Cells(i, 6).Value)
+            
+            ' Check if the backlink was found or lost based on status
+            Select Case wsLostLinks.Cells(i, 5).Value 'Status
+            Case "Lost"
+                lostBacklinks = lostBacklinks + Abs(myValue)
+            Case "Found"
+                foundBacklinks = foundBacklinks + myValue
+            Case Else
+                'Any other value?
+            End Select
+            
+            ' Check if we've reached a new domain
+            If (i = lastRow) Or (domain <> GetDomain(ws.Cells(i + 1, 1).Value)) Then
+                ' Determine the domain status
+                domainStatus = IIf(foundBacklinks > lostBacklinks, "Found", "Lost")
+                
+                ' Add the domain to the New_Lost_Domains sheet
+                .Cells(.Rows.Count, "A").End(xlUp).Offset(1, 0).Value = domain
+                .Cells(.Rows.Count, "B").End(xlUp).Offset(1, 0).Value = domainRating
+                .Cells(.Rows.Count, "C").End(xlUp).Offset(1, 0).Value = foundDate
+                .Cells(.Rows.Count, "D").End(xlUp).Offset(1, 0).Value = domainStatus
+                
+                ' Reset the counters
+                foundBacklinks = 0
+                lostBacklinks = 0
+            End If
+        Next i
+        
+        'Sort column C by date oldest to newest
+        .Range("C:C").Sort Key1:=.Range("C1"), Order1:=xlAscending, Header:=xlYes
+    
+        'Remove duplicates where column A and D are the same and only if column D is Found
+        .Range("A:D").RemoveDuplicates Columns:=Array(1, 4), Header:=xlYes
+    
+        'Sort column C by date newest to oldest
+        .Range("C:C").Sort Key1:=Range("C1"), Order1:=xlDescending, Header:=xlYes
+    
+        'Remove duplicates where column A and D are the same and only if column D is Lost
+        .Range("A:D").RemoveDuplicates Columns:=Array(1, 4), Header:=xlYes
+    
+        'Add column headers
+        .Range("A1:E1").Value = Array("Referring Domain", "Domain Rating", "Date", "Lost/Found", "Type")
+    
+        'Populate column E based on column D
+        For Each cell In .Range("D2:D" & Range("D" & Rows.Count).End(xlUp).Row)
+            cell.Offset(0, 1).Value = IIf(cell.Value = "Found", 1, -1)
+        Next cell
+        
+    End With 'NEW LOST DOMAINS ======================================================================
+    
+    
+End Sub
+
+Private Function GetSheet(ByVal name As String, ByRef wb As Excel.Workbook) As Excel.Worksheet
+    'TODO: Get's sheet by name, or creates a new sheet with the name
+    Debug.Print "Working on " & name & " ..."
+    On Error GoTo Suberror
+    Set GetSheet = wb.Worksheets(name)
+    Debug.Print "..Found!"
+    Exit Function
+Suberror:
+    Set GetSheet = wb.Worksheets.Add(After:=wb.Worksheets(wb.Worksheets.Count))
+    GetSheet.name = name
+    Debug.Print "..Created!"
+End Function
+
+
+Function GetDomain(url As String) As String
+    ' This function extracts the domain name from a URL
+    
+    Dim domain As String
+    Dim parts As Variant
+    
+    parts = Split(url, "/")
+    
+    If UBound(parts) >= 2 Then
+        If InStr(parts(2), "www.") = 1 Then
+            domain = Mid(parts(2), 5)
+        Else
+            domain = parts(2)
+        End If
+    End If
+    
+    GetDomain = domain
+
+End Function
