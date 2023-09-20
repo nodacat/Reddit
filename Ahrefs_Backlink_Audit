@@ -311,7 +311,7 @@ Public Sub Ahrefs_Backlink_Audit()
 End Sub
 
 Private Function GetSheet(ByVal name As String, ByRef wb As Excel.Workbook) As Excel.Worksheet
-    'TODO: Get's sheet by name, or creates a new sheet with the name
+    'TODO: Gets sheet by name, or creates a new sheet with the name
     Debug.Print "Working on " & name & " ..."
     On Error GoTo Suberror
     Set GetSheet = wb.Worksheets(name)
