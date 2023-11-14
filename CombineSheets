@@ -1,0 +1,70 @@
+'for https://www.reddit.com/r/vba/comments/17uyz0w/faster_way_to_combine_all_worksheets_into_one/
+
+
+Public Sub CombineSheets2()
+    Dim master_ws As Excel.Worksheet
+    Dim ws As Excel.Worksheet
+    Dim wb As Excel.Workbook
+    Dim i As Long, col_count As Long, lastRow As Long
+    Dim masterLastRow As Long
+    
+    On Error GoTo SubError
+    
+    ' Turn off updating and calcualtion
+    With Excel.Application
+        .ScreenUpdating = False
+        .Calculation = xlCalculationManual
+    End With
+    
+    ' Working in this workbook
+    Set wb = Excel.ActiveWorkbook
+    
+    ' Add new worksheet as the last worksheet
+    Set master_ws = wb.Worksheets.Add(Before:=wb.Worksheets(1))
+    Rename_Sheet master_ws, wb, "Master Sheet"
+    
+    ' Copy headers
+    With Range(wb.Worksheets(2).Cells(1, 1), wb.Worksheets(2).Cells(1, 1).End(xlToRight))
+        col_count = .Columns.Count
+        master_ws.Cells(1, 1).Resize(1, col_count).Value2 = .Value2
+    End With
+    
+    ' Loop through each sheet
+    masterLastRow = 2
+    For Each ws In wb.Worksheets
+        If ws.Name <> "Master Sheet" Then
+        
+            'Get last row of current sheet
+            lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row - 1 'exclude header
+            
+            'If to many rows give error
+            If masterLastRow + lastRow > 1048576 Then
+                MsgBox "Excel can only handle 1048576 rows, worksheet merger stopped at worksheet: " _
+                & ws.Name, vbCritical
+                Exit For
+            End If
+    
+            'Copy Data
+            If lastRow > 0 Then
+                master_ws.Cells(masterLastRow, 1).Resize(lastRow, col_count).Value2 = ws.Cells(2, 1).Resize(lastRow, col_count).Value2
+                masterLastRow = masterLastRow + lastRow
+            End If
+        End If
+    Next
+    
+SubError:
+    ' Turn on updating and calcualtions
+    With Excel.Application
+        .ScreenUpdating = True
+        .Calculation = xlCalculationAutomatic
+    End With
+    
+    Select Case Err.Number
+    Case 0 'No error
+    Case Else
+        'Re-raise error to user
+        Err.Raise Err.Number, , Err.Description
+    End Select
+    
+End Sub
+
