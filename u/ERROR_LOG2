@@ -1,0 +1,143 @@
+'FOR: https://www.reddit.com/r/vba/comments/181aw4t/excel_possible_to_make_this_macro_run_faster/
+
+Option Explicit
+
+Public Sub Error_Log()
+    
+    Const LOG_SHEET_NAME As String = "{ Error Log }"
+    
+    Dim wb As Excel.Workbook
+    Dim ws As Excel.Worksheet
+    Dim wsLog As Excel.Worksheet
+    Dim rng As Excel.Range
+    Dim rngLog As Excel.Range
+    Dim lastRow As Long
+    Dim myUsedRange As Excel.Range
+    
+    On Error GoTo Cancel
+    
+    ' - Optimize Application
+    With Excel.Application
+        .ScreenUpdating = False
+        .Calculation = xlCalculationManual
+    End With
+    
+    'DeleteOldErrorLog <-added when testing over and over, you should probably add something like this
+    
+    ' - Init variables
+    Set wb = Excel.ActiveWorkbook
+    Set wsLog = wb.Sheets.Add(After:=wb.Sheets(wb.Sheets.Count))
+    wsLog.Name = LOG_SHEET_NAME
+    Set rngLog = wsLog.Range("C4")
+    rngLog.Resize(1, 5).Value2 = Array("Sheet Name", "Cell Location", "Error Type", "Reviewed?", "Notes")
+    lastRow = 1
+    
+    'FIND ERRORS
+    For Each ws In wb.Sheets
+        If ws.Name <> LOG_SHEET_NAME And ws.Name <> "Productivity" Then
+            
+            ' - Special find last used cell with value. Helps when UsedRange has grown much larger
+            '   than the actual used range
+            With ws.UsedRange
+                Set myUsedRange = ws.Range( _
+                    .Cells(1, 1), _
+                    .Find( _
+                        What:="*", _
+                        After:=.Cells(1, 1), _
+                        LookAt:=xlPart, _
+                        LookIn:=xlFormulas, _
+                        SearchOrder:=xlByRows, _
+                        SearchDirection:=xlPrevious, _
+                        MatchCase:=False _
+                ))
+            End With
+            
+            ' - Search for errors in  all cells in myUsedRange
+            For Each rng In myUsedRange
+                If IsError(rng.Value2) And Not IsNumeric(rng.Value2) Then
+                    
+                    ' - Populate Log
+                    With rngLog.Offset(lastRow, 0)
+                        .Resize(1, 5) = Array(ws.Name, rng.Address, rng.Value, "", "")
+                        .Offset(0, 1).Hyperlinks.Add _
+                            Anchor:=.Offset(0, 1), _
+                            Address:="", _
+                            SubAddress:=ws.Name & "!" & rng.Address, _
+                            TextToDisplay:=rng.Address
+                    End With
+                    
+                    lastRow = lastRow + 1
+                End If
+            Next
+        End If
+    Next
+    
+    'FORMAT OUTPUT
+    With wsLog
+        ' - Resize Column widths
+        .Columns("A:B").ColumnWidth = 3
+        .Columns("C").ColumnWidth = 20
+        .Columns("D:F").ColumnWidth = 12
+        .Columns("G").ColumnWidth = 100
+        .Columns("H:I").ColumnWidth = 3
+
+        ' - Title & Formatting
+        With .Range("C2")
+            .Value2 = "Error Log"
+            .Font.Name = "Arial"
+            .Font.Size = 20
+        End With
+        With .Range("C2:G2")
+            .EntireRow.RowHeight = 26.25
+            .Borders(xlEdgeBottom).LineStyle = xlContinuous
+            .Borders(xlEdgeBottom).Weight = xlThick
+            .Borders(xlEdgeTop).LineStyle = xlContinuous
+            .Borders(xlEdgeTop).Weight = xlThin
+        End With
+        
+        ' - Header Formatting
+        With rngLog.Resize(1, 5)
+            .Font.Bold = True
+            .Borders(xlEdgeBottom).LineStyle = xlContinuous
+            .Borders(xlEdgeBottom).Weight = xlThin
+        End With
+        
+        ' - Body Formatting
+        .UsedRange.EntireRow.AutoFit
+        With rngLog.Offset(1, 0).Resize(lastRow - 1, 1)
+            
+            ' - ErrorType
+            .Offset(0, 2).HorizontalAlignment = xlLeft
+            
+            ' - Reviewed? | Notes
+            With .Offset(0, 3).Resize(, 2)
+                .Interior.Pattern = xlSolid
+                .Font.Color = "16711680"
+                .Interior.Color = "6750207"
+            End With
+            
+        End With
+        .Columns("J:XFD").Hidden = True
+        .Activate
+        .Rows(5).Select
+        Excel.ActiveWindow.FreezePanes = True
+        Excel.ActiveWindow.DisplayGridlines = False
+        
+    End With
+    
+Cancel:
+
+    ' - Reset Application
+    With Excel.Application
+        .ScreenUpdating = True
+        .Calculation = xlCalculationAutomatic
+    End With
+    
+    ' - Error Reporting
+    Select Case err.Number
+    Case 0 'No Error
+    Case Else
+        Debug.Print err.Number, err.Description
+    End Select
+    
+End Sub
