@@ -34,7 +34,7 @@ Public Sub Error_Log2()
     
     'FIND ERRORS
     For Each ws In wb.Sheets
-        If ws.Name <> LOG_SHEET_NAME And ws.Name <> "Productivity" Then
+        If ws.Name <> LOG_SHEET_NAME And ws.Name <> "Productivity Pack" Then
             
             ' - Special find last used cell with value. Helps when UsedRange has grown much larger
             '   than the actual used range
