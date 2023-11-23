@@ -2,7 +2,7 @@
 
 Option Explicit
 
-Public Sub Error_Log()
+Public Sub Error_Log2()
     
     Const LOG_SHEET_NAME As String = "{ Error Log }"
     
