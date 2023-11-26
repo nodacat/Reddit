@@ -1,9 +1,10 @@
 Option Explicit
 
-Public Sub Error_Log3()
+Public Sub Error_Log2()
     
-    Const LOG_SHEET_NAME As String = "{ Error Log }"
-    Const LOG_START_RANGE As String = "C4"
+    Const LOG_SHEET_NAME As String = "{ Error Log }"    'Generated (and deleted) Log Worksheet name
+    Const LOG_TITLE_RANGE As String = "C2"              'Title cell
+    Const LOG_HEADER_RANGE As String = "C4"             'Log Header cell; Offset(1,0) for Log Body
     
     Dim wb As Excel.Workbook        'ActiveWorkbook
     Dim ws As Excel.Worksheet       'Checked Sheet
@@ -80,11 +81,11 @@ SheetDeleteError:
         wsLog.name = LOG_SHEET_NAME
         
         ' - Add Headers
-        wsLog.Range(LOG_START_RANGE).Resize(1, 5).Value2 = Array("Sheet Name", "Cell Location", "Error Type", "Reviewed?", "Notes")
+        wsLog.Range(LOG_HEADER_RANGE).Resize(1, 5).Value2 = Array("Sheet Name", "Cell Location", "Error Type", "Reviewed?", "Notes")
         
         ' - Loop through collection and populate data to sheet
         colWidth = UBound(col.Item(1), 1) - LBound(col.Item(1), 1) + 1
-        With wsLog.Range(LOG_START_RANGE)
+        With wsLog.Range(LOG_HEADER_RANGE)
             For i = 1 To col.Count
                 
                 'Output values
@@ -97,7 +98,7 @@ SheetDeleteError:
         
         'FORMAT ERROR LOG REPORT
         With wsLog
-            ' - Resize Column widths
+            ' - Resize Column widths (manual, but could use reference to LOG_HEADER_RANGE column etc)
             .Columns("A:B").ColumnWidth = 3
             .Columns("C").ColumnWidth = 20
             .Columns("D:F").ColumnWidth = 12
@@ -105,12 +106,12 @@ SheetDeleteError:
             .Columns("H:I").ColumnWidth = 3
     
             ' - Title & Formatting
-            With .Range("C2")
+            With .Range(LOG_TITLE_RANGE)
                 .Value2 = "Error Log"
                 .Font.name = "Arial"
                 .Font.Size = 20
             End With
-            With .Range("C2:G2")
+            With .Range(LOG_TITLE_RANGE).Resize(1, colWidth)
                 .EntireRow.RowHeight = 26.25
                 .Borders(xlEdgeBottom).LineStyle = xlContinuous
                 .Borders(xlEdgeBottom).Weight = xlThick
@@ -119,16 +120,14 @@ SheetDeleteError:
             End With
             
             ' - Header Formatting
-            With .Range(LOG_START_RANGE).Resize(1, 5)
+            With .Range(LOG_HEADER_RANGE).Resize(1, colWidth)
                 .Font.Bold = True
                 .Borders(xlEdgeBottom).LineStyle = xlContinuous
                 .Borders(xlEdgeBottom).Weight = xlThin
             End With
-            
-            ' - Body Formatting
-            .UsedRange.EntireRow.AutoFit
-            With .Range(LOG_START_RANGE).Offset(1, 0).Resize(col.Count, 1)
                 
+            ' - Body Formatting
+            With .Range(LOG_HEADER_RANGE).Offset(1, 0).Resize(col.Count, 1)
                 ' - ErrorType
                 .Offset(0, 2).HorizontalAlignment = xlLeft
                 
@@ -138,8 +137,9 @@ SheetDeleteError:
                     .Font.Color = "16711680"
                     .Interior.Color = "6750207"
                 End With
-                
             End With
+            
+            .UsedRange.EntireRow.AutoFit
             .Columns("J:XFD").Hidden = True
             .Activate
             .Rows(5).Select
@@ -261,4 +261,3 @@ Private Sub AddCircRefToCollection(ByRef ws As Excel.Worksheet, ByRef col As Col
         Next
     End If
 End Sub
-
