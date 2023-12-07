@@ -18,7 +18,7 @@ Public Sub ErrorLog3()
     For Each ws In Excel.ThisWorkbook.Worksheets
         
         Select Case ws.Name
-        Case LOG_SHEET_NAME, ""
+        Case LOG_SHEET_NAME, "Productivity Pack"
             'Ignore these
         Case Else
             'Check these
