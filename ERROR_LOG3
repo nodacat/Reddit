@@ -1,0 +1,70 @@
+Option Explicit
+
+Public Sub ErrorLog3()
+    
+    Const LOG_SHEET_NAME As String = "{ Error Log }"    'Generated (and deleted) Log Worksheet name
+    Const LOG_TITLE_RANGE As String = "C2"              'Title cell
+    Const LOG_HEADER_RANGE As String = "C4"             'Log Header cell; Offset(1,0) for Log Body
+    
+    Dim wb As Excel.Workbook
+    Dim ws As Excel.Worksheet
+    Dim wsLog As Excel.Worksheet
+    Dim errCol As New Collection
+    
+    Set wb = Excel.ActiveWorkbook
+    Set wsLog = GetSheet(wb, LOG_SHEET_NAME)
+    
+    'BUILD COLLECTION OF ERRORS
+    For Each ws In Excel.ThisWorkbook.Worksheets
+        
+        Select Case ws.Name
+        Case LOG_SHEET_NAME, ""
+            'Ignore these
+        Case Else
+            'Check these
+            
+            ErrorLog_CellErrors ws, errCol
+            ErrorLog_SpellCheck ws, errCol
+            ErrorLog_CircRefs ws, errCol
+            
+        End Select
+    
+    Next ws
+    
+    'BUILD AND FORMAT OUTPUT TABLE IF ERRORS WERE FOUND
+    If errCol.Count > 0 Then
+        '...Logic to build & format error log
+    End If
+    
+End Sub
+
+
+'==============================================================================================================
+' HELPER ROUTINES & FUNCTIONS
+'==============================================================================================================
+Private Function GetSheet(ByVal wb As Excel.Workbook, ByVal sheetName As String) As Excel.Worksheet
+    'Delete current sheet if it exists, then return new one by same name
+    On Error GoTo FuncError
+    Set GetSheet = wb.Worksheets(sheetName)
+    GetSheet.UsedRange.ClearContents
+    Debug.Print "GetSheet() : Reset existing sheet '" & sheetName & "'"
+    Exit Function
+FuncError:
+    With wb.Worksheets
+        Set GetSheet = .Add(after:=.Item(.Count))
+        GetSheet.Name = sheetName
+    End With
+    Debug.Print "GetSheet() : Created new sheet '" & sheetName & "'"
+End Function
+
+Private Sub ErrorLog_CellErrors(ByRef ws As Excel.Worksheet, ByRef errCol As Collection)
+    'Loop through cells and check for errors
+End Sub
+
+Private Sub ErrorLog_SpellCheck(ByRef ws As Excel.Worksheet, ByRef errCol As Collection)
+    'Loop through cells and check for spelling errors
+End Sub
+
+Private Sub ErrorLog_CircularReferences(ByRef ws As Excel.Worksheet, ByRef errCol As Collection)
+    'Loop through cells and chek for circular references
+End Sub
