@@ -43,7 +43,7 @@ End Sub
 ' HELPER ROUTINES & FUNCTIONS
 '==============================================================================================================
 Private Function GetSheet(ByVal wb As Excel.Workbook, ByVal sheetName As String) As Excel.Worksheet
-    'Delete current sheet if it exists, then return new one by same name
+    'Clear existing sheet if it exists, or return new one by same name
     On Error GoTo FuncError
     Set GetSheet = wb.Worksheets(sheetName)
     GetSheet.UsedRange.ClearContents
