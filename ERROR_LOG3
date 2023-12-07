@@ -15,7 +15,7 @@ Public Sub ErrorLog3()
     Set wsLog = GetSheet(wb, LOG_SHEET_NAME)
     
     'BUILD COLLECTION OF ERRORS
-    For Each ws In Excel.ThisWorkbook.Worksheets
+    For Each ws In wb.Worksheets
         
         Select Case ws.Name
         Case LOG_SHEET_NAME, "Productivity Pack"
