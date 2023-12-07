@@ -65,6 +65,6 @@ Private Sub ErrorLog_SpellCheck(ByRef ws As Excel.Worksheet, ByRef errCol As Col
     'Loop through cells and check for spelling errors
 End Sub
 
-Private Sub ErrorLog_CircularReferences(ByRef ws As Excel.Worksheet, ByRef errCol As Collection)
+Private Sub ErrorLog_CircRefs(ByRef ws As Excel.Worksheet, ByRef errCol As Collection)
     'Loop through cells and chek for circular references
 End Sub
