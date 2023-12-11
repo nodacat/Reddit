@@ -1,70 +1,446 @@
 Option Explicit
 
-Public Sub ErrorLog3()
+Const ERRORS_SHEETNAME As String = "{ Errors }"
+Const TYPOS_SHEETNAME As String = "{ Typos }"
+Const CIRCS_SHEETNAME As String = "{ Circs }"
+
+Const ERRORS_TITLE As String = "Error Log"
+Const TYPOS_TITLE As String = "Typos Log"
+Const CIRCS_TITLE As String = "Circular Reference Log"
+
+Public Sub Run_All_Logs()
+    'Purpose: Runs all logs at once if needed
+    Log_Errors
+    Log_Typos
+    Log_Circs
+End Sub
+
+Public Sub Log_Errors()
+    'Purpose: Checks all worksheets for cells with errors
     
-    Const LOG_SHEET_NAME As String = "{ Error Log }"    'Generated (and deleted) Log Worksheet name
+    Dim col As New Collection           'Collection of errors; Expects Array([sheet name], [cell address], [cell value / error type])
+    Dim logName As String               'UNIQUE TO CHECK; Stores the name of the error log sheet
+    Dim logTitle As String              'UNIQUE TO CHECK; Stores the title of the output log
+    Dim wb As Excel.Workbook            'ActiveWorkbook, defined as wb in case ActiveWorkbook changes (scope changes)
+    Dim ws As Excel.Worksheet           'Looping worksheet of wb.Worksheets
+    Dim wsLog As Excel.Worksheet        'UNIQUE TO CHECK; Error log sheet, to be deleted then regenerated
+    Dim rngUsed As Excel.Range          'UNIQUE TO CHECK; Used range
+    Dim rng As Excel.Range              'Looping range of rngUsed
+
+    ' UNIQUE TO CHECK --------------------------------------------------
+    logName = ERRORS_SHEETNAME
+    logTitle = ERRORS_TITLE
+    '-------------------------------------------------------------------
+    
+    On Error GoTo SubError
+    
+    ' - Delete error log from workbook
+    Set wb = Excel.ActiveWorkbook
+    With Excel.Application
+        .Calculation = xlCalculationManual
+        .ScreenUpdating = False
+    End With
+    SafelyDeleteSheet wb, logName
+    
+    ' - Loop through all cells and perform check
+    For Each ws In wb.Worksheets
+        Select Case ws.Name
+        Case ERRORS_SHEETNAME, TYPOS_SHEETNAME, CIRCS_SHEETNAME, "Productivity Pack"
+            ' - Ignore
+        Case Else
+            ' - Run Check
+            
+            ' UNIQUE TO CHECK --------------------------------------------------
+            Set rngUsed = GetUsedRange(ws) 'returns either a range or nothing
+            '-------------------------------------------------------------------
+            
+            If Not rngUsed Is Nothing Then
+                For Each rng In rngUsed
+                    
+                    ' UNIQUE TO CHECK --------------------------------------------------
+                    ' - per cell check logic
+                    If IsError(rng.Value2) And Not IsNumeric(rng.Value2) Then
+                        col.Add Array(ws.Name, rng.Address(True, True), rng.Value2)
+                    End If
+                    '-------------------------------------------------------------------
+                    
+                Next
+            End If
+        End Select
+    Next
+    
+    ' - Output Collection to Sheet
+    If col.Count > 0 Then
+        
+        ' - Create new error log sheet
+        With wb.Worksheets
+            Set wsLog = .Add(After:=.Item(.Count))
+            wsLog.Name = logName
+        End With
+        
+        ' - populate collection to error log sheet
+        PopulateLogFromCollection wsLog, col, logTitle
+        
+    End If
+
+SubError:
+    ' - Return app settings to original values
+    With Excel.Application
+        .DisplayAlerts = True
+        .Calculation = xlCalculationManual
+        .ScreenUpdating = True
+    End With
+    
+    ' - Output done message or error
+    If Err.Number = 0 Then
+        If wsLog Is Nothing Then
+            MsgBox "Done! No errors to report", vbOKOnly, logTitle
+        Else
+            MsgBox "Done! Errors were found. Error Log '" & logName & "' was generated!", vbOKOnly, logTitle
+        End If
+    Else
+        Err.Raise Err.Number, , Err.Description
+    End If
+End Sub
+
+
+Public Sub Log_Typos()
+    'Purpose: Checks all worksheets for cells with spelling errors
+    
+    Dim col As New Collection           'Collection of errors; Expects Array([sheet name], [cell address], [cell value / error type])
+    Dim logName As String               'UNIQUE TO CHECK; Stores the name of the error log sheet
+    Dim logTitle As String              'UNIQUE TO CHECK; Stores the title of the output log
+    Dim wb As Excel.Workbook            'ActiveWorkbook, defined as wb in case ActiveWorkbook changes (scope changes)
+    Dim ws As Excel.Worksheet           'Looping worksheet of wb.Worksheets
+    Dim wsLog As Excel.Worksheet        'UNIQUE TO CHECK; Error log sheet, to be deleted then regenerated
+    Dim rngUsed As Excel.Range          'UNIQUE TO CHECK; Used range
+    Dim rng As Excel.Range              'Looping range of rngUsed
+
+    ' UNIQUE TO CHECK --------------------------------------------------
+    logName = TYPOS_SHEETNAME
+    logTitle = TYPOS_TITLE
+    '-------------------------------------------------------------------
+    
+    On Error GoTo SubError
+    
+    ' - Delete error log from workbook
+    Set wb = Excel.ActiveWorkbook
+    With Excel.Application
+        .Calculation = xlCalculationManual
+        .ScreenUpdating = False
+    End With
+    SafelyDeleteSheet wb, logName
+    
+    ' - Loop through all cells and perform check
+    For Each ws In wb.Worksheets
+        Select Case ws.Name
+        Case ERRORS_SHEETNAME, TYPOS_SHEETNAME, CIRCS_SHEETNAME, "Productivity Pack"
+            ' - Ignore
+        Case Else
+            ' - Run Check
+            
+            ' UNIQUE TO CHECK --------------------------------------------------
+            Set rngUsed = GetUsedRange(ws) 'returns either a range or nothing
+            '-------------------------------------------------------------------
+            
+            If Not rngUsed Is Nothing Then
+                For Each rng In rngUsed
+                    
+                    ' UNIQUE TO CHECK --------------------------------------------------
+                    ' - per cell check logic
+                    If Not IsError(rng.Value2) Then
+                        If Not Excel.Application.CheckSpelling(rng.Value2) Then
+                            col.Add Array(ws.Name, rng.Address(True, True), "#SPELL")
+                        End If
+                    End If
+                    '-------------------------------------------------------------------
+                    
+                Next
+            End If
+        End Select
+    Next
+    
+    ' - Output Collection to Sheet
+    If col.Count > 0 Then
+        
+        ' - Create new error log sheet
+        With wb.Worksheets
+            Set wsLog = .Add(After:=.Item(.Count))
+            wsLog.Name = logName
+        End With
+        
+        ' - populate collection to error log sheet
+        PopulateLogFromCollection wsLog, col, logTitle
+        
+    End If
+
+SubError:
+    ' - Return app settings to original values
+    With Excel.Application
+        .DisplayAlerts = True
+        .Calculation = xlCalculationManual
+        .ScreenUpdating = True
+    End With
+    
+    ' - Output done message or error
+    If Err.Number = 0 Then
+        If wsLog Is Nothing Then
+            MsgBox "Done! No errors to report", vbOKOnly, logTitle
+        Else
+            MsgBox "Done! Errors were found. Error Log '" & logName & "' was generated!", vbOKOnly, logTitle
+        End If
+    Else
+        Err.Raise Err.Number, , Err.Description
+    End If
+End Sub
+
+
+Public Sub Log_Circs()
+    'Purpose: Checks all worksheets for cells with circular references
+    
+    Dim col As New Collection           'Collection of errors; Expects Array([sheet name], [cell address], [cell value / error type])
+    Dim logName As String               'UNIQUE TO CHECK; Stores the name of the error log sheet
+    Dim logTitle As String              'UNIQUE TO CHECK; Stores the title of the output log
+    Dim wb As Excel.Workbook            'ActiveWorkbook, defined as wb in case ActiveWorkbook changes (scope changes)
+    Dim ws As Excel.Worksheet           'Looping worksheet of wb.Worksheets
+    Dim wsLog As Excel.Worksheet        'UNIQUE TO CHECK; Error log sheet, to be deleted then regenerated
+    Dim rngUsed As Excel.Range          'UNIQUE TO CHECK; Used range
+    Dim rng As Excel.Range              'Looping range of rngUsed
+
+    ' UNIQUE TO CHECK --------------------------------------------------
+    
+    ' - Special variables for circ check
+    Dim rngPrecedents As Excel.Range
+    Dim rngCircular As Excel.Range
+    
+    logName = CIRCS_SHEETNAME
+    logTitle = CIRCS_TITLE
+    '-------------------------------------------------------------------
+    
+    On Error GoTo SubError
+    
+    ' - Delete error log from workbook
+    Set wb = Excel.ActiveWorkbook
+    With Excel.Application
+        .Calculation = xlCalculationManual
+        .ScreenUpdating = False
+    End With
+    SafelyDeleteSheet wb, logName
+    
+    ' - Loop through all cells and perform check
+    For Each ws In wb.Worksheets
+        Select Case ws.Name
+        Case ERRORS_SHEETNAME, TYPOS_SHEETNAME, CIRCS_SHEETNAME, "Productivity Pack"
+            ' - Ignore
+        Case Else
+            ' - Run Check
+            
+            ' UNIQUE TO CHECK --------------------------------------------------
+            On Error Resume Next
+            Set rngUsed = ws.Cells.SpecialCells(xlCellTypeFormulas)
+            On Error GoTo SubError
+            '-------------------------------------------------------------------
+            
+            If Not rngUsed Is Nothing Then
+                For Each rng In rngUsed
+                    
+                    ' UNIQUE TO CHECK --------------------------------------------------
+                    ' - per cell check logic
+
+                    On Error Resume Next
+                    Set rngPrecedents = rng.Precedents
+                    On Error GoTo SubError
+                    
+                    If Not rngPrecedents Is Nothing Then
+                        Set rngCircular = Application.Intersect(rngPrecedents, rng)
+                        If Not rngCircular Is Nothing Then
+                            col.Add Array(ws.Name, rngCircular.Address(True, True), "#CIRC")
+                        End If
+                    End If
+                    
+                    '-------------------------------------------------------------------
+                    
+                Next
+            End If
+        End Select
+    Next
+    
+    ' - Output Collection to Sheet
+    If col.Count > 0 Then
+        
+        ' - Create new error log sheet
+        With wb.Worksheets
+            Set wsLog = .Add(After:=.Item(.Count))
+            wsLog.Name = logName
+        End With
+        
+        ' - populate collection to error log sheet
+        PopulateLogFromCollection wsLog, col, logTitle
+        
+    End If
+
+SubError:
+    ' - Return app settings to original values
+    With Excel.Application
+        .DisplayAlerts = True
+        .Calculation = xlCalculationManual
+        .ScreenUpdating = True
+    End With
+    
+    ' - Output done message or error
+    If Err.Number = 0 Then
+        If wsLog Is Nothing Then
+            MsgBox "Done! No Errors to report", vbOKOnly, logTitle
+        Else
+            MsgBox "Done! Errors were found. Error Log '" & logName & "' was generated!", vbOKOnly, logTitle
+        End If
+    Else
+        Err.Raise Err.Number, , Err.Description
+    End If
+End Sub
+
+'=======================================================================================
+' Helper Functions & Routines
+'=======================================================================================
+
+Private Sub SafelyDeleteSheet(ByRef wb As Excel.Workbook, ByVal sheetName As String)
+    Excel.Application.DisplayAlerts = False
+    On Error Resume Next
+    wb.Worksheets(sheetName).Delete
+    On Error GoTo 0
+    Excel.Application.DisplayAlerts = True
+End Sub
+
+Private Function GetUsedRange(ByRef ws As Excel.Worksheet) As Excel.Range
+    
+    'Purpose: Returns a range of used data.
+    ' - Worksheet.UsedRange can sometimes include massive amounts of empty ranges causing slowness in rng loop.
+    '   This should help tamp down the searched area to only the range it needs to review.  If this doesnt work,
+    '   remove function altogether and use ws.UsedRange as you were before.
+    
+    Dim row_start As Long
+    Dim row_end As Long
+    Dim col_start As Long
+    Dim col_end As Long
+
+    On Error GoTo funcError
+
+    With ws.UsedRange.Cells(1, 1)
+        row_start = .Row
+        col_start = .Column
+    End With
+    
+    row_end = ws.Cells.Find( _
+        What:="*", _
+        After:=ws.Cells(row_start, col_start), _
+        LookAt:=xlPart, _
+        LookIn:=xlFormulas, _
+        SearchOrder:=xlByRows, _
+        SearchDirection:=xlPrevious, _
+        MatchCase:=False _
+        ).Row
+        
+    col_end = ws.Cells.Find( _
+        What:="*", _
+        After:=ws.Cells(row_start, col_start), _
+        LookAt:=xlPart, _
+        LookIn:=xlFormulas, _
+        SearchOrder:=xlByColumns, _
+        SearchDirection:=xlPrevious, _
+        MatchCase:=False _
+        ).Column
+        
+    Set GetUsedRange = ws.Range(ws.Cells(row_start, col_start), ws.Cells(row_end, col_end))
+    
+    Exit Function
+    
+funcError:
+
+    ' - If the above code errors, it usually means there is no data to search (empty sheet). If this happens,
+    '   return nothing and handle in main code body
+    
+    Set GetUsedRange = Nothing
+    
+End Function
+
+
+Private Sub PopulateLogFromCollection(ByRef wsLog As Excel.Worksheet, ByRef col As Collection, ByVal title As String)
+    'Purpose: breakout logic for eash of future maintance
+    'Assumes:
+    ' - wsLog is empty and unformatted
+    ' - col is defined and has more than 0 items in it
+    
     Const LOG_TITLE_RANGE As String = "C2"              'Title cell
     Const LOG_HEADER_RANGE As String = "C4"             'Log Header cell; Offset(1,0) for Log Body
     
-    Dim wb As Excel.Workbook
-    Dim ws As Excel.Worksheet
-    Dim wsLog As Excel.Worksheet
-    Dim errCol As New Collection
+    Dim colWidth As Long
+    Dim i As Long
     
-    Set wb = Excel.ActiveWorkbook
-    Set wsLog = GetSheet(wb, LOG_SHEET_NAME)
+    ' - Add Headers
+    wsLog.Range(LOG_HEADER_RANGE).Resize(1, 5).Value2 = Array("Sheet Name", "Cell Location", "Error Type", "Reviewed?", "Notes")
     
-    'BUILD COLLECTION OF ERRORS
-    For Each ws In wb.Worksheets
-        
-        Select Case ws.Name
-        Case LOG_SHEET_NAME, "Productivity Pack"
-            'Ignore these
-        Case Else
-            'Check these
+    ' - Loop through collection and populate data to sheet
+    colWidth = UBound(col.Item(1), 1) - LBound(col.Item(1), 1) + 1
+    With wsLog.Range(LOG_HEADER_RANGE)
+        For i = 1 To col.Count
             
-            ErrorLog_CellErrors ws, errCol
-            ErrorLog_SpellCheck ws, errCol
-            ErrorLog_CircRefs ws, errCol
+            'Output values
+            .Offset(i, 0).Resize(1, colWidth).Value2 = col.Item(i)
             
-        End Select
-    
-    Next ws
-    
-    'BUILD AND FORMAT OUTPUT TABLE IF ERRORS WERE FOUND
-    If errCol.Count > 0 Then
-        '...Logic to build & format error log
-    End If
-    
-End Sub
-
-
-'==============================================================================================================
-' HELPER ROUTINES & FUNCTIONS
-'==============================================================================================================
-Private Function GetSheet(ByVal wb As Excel.Workbook, ByVal sheetName As String) As Excel.Worksheet
-    'Clear existing sheet if it exists, or return new one by same name
-    On Error GoTo FuncError
-    Set GetSheet = wb.Worksheets(sheetName)
-    GetSheet.UsedRange.ClearContents
-    Debug.Print "GetSheet() : Reset existing sheet '" & sheetName & "'"
-    Exit Function
-FuncError:
-    With wb.Worksheets
-        Set GetSheet = .Add(after:=.Item(.Count))
-        GetSheet.Name = sheetName
+            'Output cell link
+            .Offset(i, 1).Hyperlinks.Add .Offset(i, 1), "", "'" & col.Item(i)(0) & "'!" & col.Item(i)(1), , col.Item(i)(1)
+        Next
     End With
-    Debug.Print "GetSheet() : Created new sheet '" & sheetName & "'"
-End Function
+    
+    ' - Format error log report
+    With wsLog
+        ' - Resize Column widths (manual, but could use reference to LOG_HEADER_RANGE column etc)
+        .Columns("A:B").ColumnWidth = 3
+        .Columns("C").ColumnWidth = 20
+        .Columns("D:F").ColumnWidth = 12
+        .Columns("G").ColumnWidth = 100
+        .Columns("H:I").ColumnWidth = 3
 
-Private Sub ErrorLog_CellErrors(ByRef ws As Excel.Worksheet, ByRef errCol As Collection)
-    'Loop through cells and check for errors
-End Sub
-
-Private Sub ErrorLog_SpellCheck(ByRef ws As Excel.Worksheet, ByRef errCol As Collection)
-    'Loop through cells and check for spelling errors
-End Sub
-
-Private Sub ErrorLog_CircRefs(ByRef ws As Excel.Worksheet, ByRef errCol As Collection)
-    'Loop through cells and chek for circular references
+        ' - Title & Formatting
+        With .Range(LOG_TITLE_RANGE)
+            .Value2 = title
+            .Font.Name = "Arial"
+            .Font.Size = 20
+        End With
+        With .Range(LOG_TITLE_RANGE).Resize(1, colWidth)
+            .EntireRow.rowHeight = 26.25
+            .Borders(xlEdgeBottom).LineStyle = xlContinuous
+            .Borders(xlEdgeBottom).Weight = xlThick
+            .Borders(xlEdgeTop).LineStyle = xlContinuous
+            .Borders(xlEdgeTop).Weight = xlThin
+        End With
+        
+        ' - Header Formatting
+        With .Range(LOG_HEADER_RANGE).Resize(1, colWidth)
+            .Font.Bold = True
+            .Borders(xlEdgeBottom).LineStyle = xlContinuous
+            .Borders(xlEdgeBottom).Weight = xlThin
+        End With
+            
+        ' - Body Formatting
+        With .Range(LOG_HEADER_RANGE).Offset(1, 0).Resize(col.Count, 1)
+            ' - ErrorType
+            .Offset(0, 2).HorizontalAlignment = xlLeft
+            
+            ' - Reviewed? | Notes
+            With .Offset(0, 3).Resize(, 2)
+                .Interior.Pattern = xlSolid
+                .Font.Color = "16711680"
+                .Interior.Color = "6750207"
+            End With
+        End With
+        
+        .UsedRange.EntireRow.AutoFit
+        .Columns("J:XFD").Hidden = True
+        .Activate
+        .Rows(5).Select
+        Excel.ActiveWindow.FreezePanes = True
+        Excel.ActiveWindow.DisplayGridlines = False
+        
+    End With
 End Sub
