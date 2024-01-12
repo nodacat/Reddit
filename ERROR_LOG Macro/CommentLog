@@ -1,0 +1,352 @@
+Option Explicit
+
+Const COMMENTS_SHEETNAME As String = "{ Comment Log }"
+Const COMMENTS_TITLE As String = "Comment Log"
+
+Private Enum eComRec
+    'Header locations for coment record.  Change this with headers
+    com_isNew = 0
+    com_sheetName = 1
+    com_cellLoc = 2
+    com_type = 3
+    com_item = 4
+    com_iterations = 5
+    com_author = 6
+    com_text = 7
+    com_notes = 8
+End Enum
+
+Public Sub Comment_Log()
+
+    Const LOG_TITLE_RANGE As String = "C2"              'Title cell
+    Const LOG_HEADER_RANGE As String = "C4"             'Log Header cell; Offset(1,0) for Log Body
+
+    Dim dic As New Scripting.Dictionary     'Dictionary to hold all comments by 'Sheet'!Range
+    Dim col As Collection               'Collection of iterations of comment in cell range
+    Dim logName As String               'Stores the name of the error log sheet
+    Dim logTitle As String              'Stores the title of the output log
+    Dim logHeaders As Variant
+    Dim wb As Excel.Workbook            'ActiveWorkbook, defined as wb in case ActiveWorkbook changes (scope changes)
+    Dim ws As Excel.Worksheet           'Looping worksheet of wb.Worksheets
+    Dim wsLog As Excel.Worksheet        'Error log sheet, to be deleted then regenerated
+    Dim com1 As Excel.Comment           'Old-style comments
+    Dim com2 As Excel.CommentThreaded   'New-style, threaded comments
+    Dim colWidth As Long                'Calcuated width of logHeaders
+    Dim i As Long, j As Long            'Loop variables
+    Dim k As Long, v As Long            'Loop variables cont.
+    Dim append As Boolean               'Determins if we recreated or append to existing comment log
+    Dim existingCount As Long           'Old record count; used in formating
+    Dim addedCount As Long              'New record count; used in formating
+    Dim totalCount As Long              'Total record count; used in formating
+    
+    logName = COMMENTS_SHEETNAME
+    logTitle = COMMENTS_TITLE
+    logHeaders = Array("Sheet Name", "Cell Location", "Type", "Item", "Iteration", "Author", "Comment", "Notes")
+    colWidth = UBound(logHeaders) - LBound(logHeaders) + 1
+    existingCount = 0
+    
+    Set wb = Excel.ActiveWorkbook
+    
+    ' - Get Log Sheet
+    Set wb = Excel.ActiveWorkbook
+    If SheetExists(wb, logName) Then
+        
+        ' - Prompt user to ask if we should append or delete existing sheet
+        Dim result As VbMsgBoxResult
+        result = MsgBox("A " & logName & " sheet already exists.  If you would like to append data, click 'Yes', to delete and start over click 'No'.", vbYesNo, "Append Comments?")
+        
+        Select Case result
+        Case VbMsgBoxResult.vbYes
+        
+            ' - Append to existing data
+            append = True
+            Set wsLog = wb.Worksheets(logName)
+            
+            ' - Load pre-existing data to temporary colleciton for review later
+            i = 1
+            With wsLog.Range(LOG_HEADER_RANGE)
+                While .Offset(i, 0).Value2 <> ""
+                    AddRngToDic dic, .Offset(i, 0).Resize(1, colWidth)
+                    existingCount = existingCount + 1
+                    i = i + 1
+                Wend
+            End With
+
+        Case VbMsgBoxResult.vbNo
+            ' - Delete and start over
+            Excel.Application.DisplayAlerts = False
+            wb.Worksheets(logName).Delete
+            Excel.Application.DisplayAlerts = True
+            Set wsLog = Nothing
+            
+        Case Else ' Error, neither No or Yes was selected
+            MsgBox "Comment Log generation was canceled", vbCritical, "Comment_Log()"
+            Exit Sub '<- alternatively use End
+        End Select
+    End If
+
+    ' - Loop through all cells and perform check
+    Set col = New Collection
+    For Each ws In wb.Worksheets
+        Select Case ws.Name
+        Case COMMENTS_SHEETNAME, "Productivity Pack"  '<--- Add your other sheet names here!
+            ' - Ignore
+        Case Else
+            ' - Run Check
+            
+            ' - Check if data already exists
+            'Regular/Traditonal Excel Comments
+            For Each com1 In ws.Comments
+                AddComToDic dic, com1
+            Next
+            
+            'Threaded Comments & Replies
+            For Each com2 In ws.CommentsThreaded
+                AddComToDic dic, com2
+                
+                ' - Look through each reply
+                For i = 1 To com2.Replies.Count
+                    AddComToDic dic, com2.Replies(i), i
+                Next
+            Next
+            
+        End Select
+    Next
+
+    If wsLog Is Nothing Then
+        append = False
+        Set wsLog = wb.Worksheets.Add(After:=wb.Worksheets(wb.Worksheets.Count))
+        wsLog.Name = logName
+        existingCount = 0
+    End If
+    
+    ' - Populate log with collection data
+    With wsLog.Range(LOG_HEADER_RANGE).Offset(existingCount, 0)
+        j = 1
+        For i = 0 To dic.Count - 1
+            Set col = dic(dic.Keys()(i))
+            For k = 1 To col.Count
+                ' - Collection incldues old and new records, filter for new
+                If col(k)(0) = 1 Then
+                    
+                    ' - Add values
+                    For v = 1 To eComRec.com_notes
+                        .Offset(j, v - 1).Value2 = col(k)(v) '<- Ouput values
+                    Next
+                    
+                    ' - Add Link
+                    .Offset(j, eComRec.com_cellLoc - 1).Hyperlinks.Add _
+                        Anchor:=.Offset(j, 1), _
+                        Address:="", _
+                        SubAddress:="'" & col(k)(eComRec.com_sheetName) & "'!" & col(k)(eComRec.com_cellLoc), _
+                        TextToDisplay:=col(k)(eComRec.com_cellLoc)  '<- Output Link
+                    addedCount = addedCount + 1
+                    j = j + 1
+                End If
+            Next k
+        Next
+    End With
+    totalCount = addedCount + existingCount
+
+    ' - If new sheet, we must format it
+    If Not append Then
+        
+        'Format all cells to width 3, then change data cells later
+        wsLog.Cells.EntireColumn.ColumnWidth = 3
+        
+        ' - Add Title
+        With wsLog.Range(LOG_TITLE_RANGE).Resize(1, colWidth)
+            .Cells(1, 1).Value2 = logTitle
+            .Font.Name = "Arial"
+            .Font.Size = 20
+            .EntireRow.RowHeight = 26.25
+            .Borders(xlEdgeBottom).LineStyle = xlContinuous
+            .Borders(xlEdgeBottom).Weight = xlThick
+            .Borders(xlEdgeTop).LineStyle = xlContinuous
+            .Borders(xlEdgeTop).Weight = xlThin
+        End With
+        
+        ' - Add Headers
+        With wsLog.Range(LOG_HEADER_RANGE).Resize(1, colWidth)
+            .Value2 = logHeaders
+            .Font.Bold = True
+            .Borders(xlEdgeBottom).LineStyle = xlContinuous
+            .Borders(xlEdgeBottom).Weight = xlThin
+            .EntireColumn.ColumnWidth = 20
+        End With
+        With wsLog.Range(LOG_HEADER_RANGE).Offset(0, -1)
+            .Offset(0, eComRec.com_item).EntireColumn.ColumnWidth = 8
+            .Offset(0, eComRec.com_iterations).EntireColumn.ColumnWidth = 8
+            .Offset(0, eComRec.com_text).EntireColumn.ColumnWidth = 50
+            .Offset(0, eComRec.com_notes).EntireColumn.ColumnWidth = 100
+        End With
+    End If
+    
+    ' - Format Data
+    With wsLog.Range(LOG_HEADER_RANGE).Resize(totalCount, 1).Offset(1, 0)
+        .Resize(, colWidth).WrapText = True
+        .Offset(0, colWidth - 1).Resize(, 1).Interior.Color = vbYellow
+    End With
+    
+    ' - Sort Data
+    With wsLog.Sort
+        .SortFields.Clear
+        
+        'Sort on Sheet Name
+        .SortFields.Add2 _
+            Key:=wsLog.Range(LOG_HEADER_RANGE).Offset(1, eComRec.com_sheetName - 1).Resize(totalCount, 1), _
+            SortOn:=xlSortOnValues, _
+            Order:=xlAscending, _
+            DataOption:=xlSortNormal
+            
+        'Sort on Cell Address
+        .SortFields.Add2 _
+            Key:=wsLog.Range(LOG_HEADER_RANGE).Offset(1, eComRec.com_cellLoc - 1).Resize(totalCount, 1), _
+            SortOn:=xlSortOnValues, _
+            Order:=xlAscending, _
+            DataOption:=xlSortNormal
+        
+        'Sort on Item
+        .SortFields.Add2 _
+            Key:=wsLog.Range(LOG_HEADER_RANGE).Offset(1, eComRec.com_item - 1).Resize(totalCount, 1), _
+            SortOn:=xlSortOnValues, _
+            Order:=xlAscending, _
+            DataOption:=xlSortNormal
+        
+        'Sort on Iteration
+        .SortFields.Add2 _
+            Key:=wsLog.Range(LOG_HEADER_RANGE).Offset(1, eComRec.com_iterations - 1).Resize(totalCount, 1), _
+            SortOn:=xlSortOnValues, _
+            Order:=xlAscending, _
+            DataOption:=xlSortNormal
+            
+        .SetRange wsLog.Range(LOG_HEADER_RANGE).Resize(totalCount + 1, colWidth)
+        .Header = xlYes
+        .MatchCase = False
+        .Orientation = xlTopToBottom
+        .SortMethod = xlPinYin
+        .Apply
+    End With
+    
+    ' - Other Formatting
+    wsLog.Activate
+    wsLog.Range(LOG_HEADER_RANGE).Offset(1, 0).EntireRow.Select
+    ActiveWindow.DisplayGridlines = False
+    ActiveWindow.FreezePanes = True
+    wsLog.Range(LOG_HEADER_RANGE).Offset(1, 0).Select
+
+End Sub
+
+Private Function SheetExists(ByRef wb As Excel.Workbook, ByVal sheetName As String) As Boolean
+    SheetExists = False
+    On Error Resume Next
+    SheetExists = wb.Worksheets(sheetName).Name = sheetName
+    On Error GoTo 0
+End Function
+
+
+Private Function AddRngToDic(ByRef dic As Scripting.Dictionary, ByVal rng As Excel.Range)
+    'TODO:
+    ' - Parse range row (in order of eComRec Enum)
+    ' - This will be acting on old data with iterations already defined
+    
+    Dim col As Collection
+    Dim comKey As String
+    Dim comValue(0 To eComRec.com_notes) As Variant
+    Dim i As Long
+    
+    comValue(eComRec.com_isNew) = 0 '0=Existing 1=New; these will all be existing
+    For i = 1 To rng.Columns.Count
+        comValue(i) = rng.Cells(1, i).Value2
+    Next i
+    comKey = "'" & comValue(eComRec.com_sheetName) & "'!" & comValue(eComRec.com_cellLoc)
+    
+    If dic.Exists(comKey) Then
+        dic(comKey).Add comValue
+    Else
+        Set col = New Collection
+        col.Add comValue
+        dic.Add comKey, col
+    End If
+    
+End Function
+
+Private Function AddComToDic(ByRef dic As Scripting.Dictionary, ByRef com As Object, Optional ByVal itemNum As Long = 0) As Boolean
+    'TODO:
+    ' - This routine takes comment object and splits it up into a reportable format
+    ' - It also keeps track of current iterations (if defined) and auto-increments if a new change is discovered(comment text changes)
+    ' - Optionally, this can be used as a function will return FALSE when the item as not added, and TRUE when it is added
+    
+    'PARAMS:
+    ' dic:      an instanciated dictionary
+    ' com:      an Excel Comment object (ether 'Comment' or the newer 'CommentThreaded'
+    ' itemNum:    0 = regular comment / parent thread
+    '            >1 = reply/child
+    ' iterNum:   -1 = new item
+    '             0 = original value
+    '            >0 = change iterations
+    
+    Dim comKey As String
+    Dim comValue As Variant
+    Dim col As Collection
+    Dim iMax As Long, i As Long, maxVal As Long
+    Dim iterNum As Long: iterNum = -1
+    
+    ' - Parse Excel comment object and put it into a consumable format for reporting (in order of eComRec)
+    Select Case TypeName(com)
+    Case "Comment"
+        comKey = "'" & com.Parent.Worksheet.Name & "'!" & com.Parent.Address(True, True)
+        comValue = Array(1, com.Parent.Worksheet.Name, com.Parent.Address(True, True), "Comment", itemNum, -1, com.Author, com.Text, "")
+    Case "CommentThreaded"
+        If itemNum = 0 Then
+            comKey = "'" & com.Parent.Worksheet.Name & "'!" & com.Parent.Address(True, True)
+            comValue = Array(1, com.Parent.Worksheet.Name, com.Parent.Address(True, True), "CommentThreaded", itemNum, -1, com.Author.Name, com.Text, "")
+        Else 'Reply!
+            comKey = "'" & com.Parent.Parent.Worksheet.Name & "'!" & com.Parent.Parent.Address(True, True)
+            comValue = Array(1, com.Parent.Parent.Worksheet.Name, com.Parent.Parent.Address(True, True), "CommentThreaded", itemNum, -1, com.Author.Name, com.Text, "")
+        End If
+    End Select
+    
+    ' - If iterNum is undefined then define it based on data in dic
+    If dic.Exists(comKey) Then
+        maxVal = -1
+        iMax = -1
+        Set col = dic(comKey)
+        For i = 1 To col.Count
+            If (col(i)(eComRec.com_item) = comValue(eComRec.com_item)) And col(i)(eComRec.com_iterations) > maxVal Then
+                maxVal = col(i)(eComRec.com_iterations)
+                iMax = i
+            End If
+        Next
+        If iMax > -1 Then
+            If (col(iMax)(eComRec.com_item) = comValue(eComRec.com_item)) And (col(iMax)(eComRec.com_text) <> comValue(eComRec.com_text)) Then
+                iterNum = col(iMax)(eComRec.com_iterations) + 1
+            Else
+                ' - already exists, we can abort here
+                AddComToDic = False
+                Exit Function
+            End If
+        Else
+            ' - Brand new!
+            iterNum = 1
+        End If
+    Else
+        ' - Brand new!
+        iterNum = 1
+    End If
+    
+    ' - Update comValue with discovered iterNum
+    comValue(eComRec.com_iterations) = iterNum
+    
+    ' - Add to dictionary
+    If dic.Exists(comKey) Then
+        dic(comKey).Add comValue
+    Else
+        Set col = New Collection
+        col.Add comValue
+        dic.Add comKey, col
+    End If
+    
+    AddComToDic = True
+End Function
+
