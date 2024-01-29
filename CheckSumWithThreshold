@@ -1,1 +1,44 @@
-'
+'For https://www.reddit.com/r/vba/comments/1ady5ou/without_judging_me_too_much_can_someone_please/
+
+Public Sub CheckSumWithThreshold()
+
+    Dim strMsg As String
+    
+    CheckHours strMsg, Range("O8:O25"), Range("H8:N25"), "Mike"
+    CheckHours strMsg, Range("O39:O56"), Range("H39:N56"), "Nick Zinni"
+    CheckHours strMsg, Range("O70:O84"), Range("H70:N84"), "Kevin Barros"
+    CheckHours strMsg, Range("O98:O112"), Range("H98:N112"), "Dave Bosma"
+    CheckHours strMsg, Range("O126:O140"), Range("H126:N140"), "Rhys Hermann"
+    CheckHours strMsg, Range("O153:O167"), Range("H153:N167"), "Jeff Pagano"
+    CheckHours strMsg, Range("O181:O195"), Range("H181:N195"), "Dan Pawlak"
+    CheckHours strMsg, Range("O209:O223"), Range("H209:N223"), "Anerea Huelsenbeck"
+    CheckHours strMsg, Range("O237:O251"), Range("H237:N251"), "Michael Emma"
+    CheckHours strMsg, Range("O265:O279"), Range("H265:N279"), "Dustin Mitschele"
+    CheckHours strMsg, Range("O293:O307"), Range("H293:N307"), "Ken Whitney"
+    CheckHours strMsg, Range("O321:O325"), Range("H321:N325"), "Joe Gagiiano"
+    CheckHours strMsg, Range("O349:O363"), Range("H349:N363"), "Joe Ledone"
+    CheckHours strMsg, Range("O376:O390"), Range("H376:N390"), "ARTHUR BURTT"
+    CheckHours strMsg, Range("O402:O416"), Range("H402:N416"), "THOMAS WASMAN"
+    CheckHours strMsg, Range("O428:O442"), Range("H428:N442"), "GERALD HUNT"
+    CheckHours strMsg, Range("O455:O469"), Range("H455:N469"), "JOHN ZANGARA"
+    CheckHours strMsg, Range("O482:O496"), Range("H482:N496"), "Jefferson Rodriges"
+    CheckHours strMsg, Range("O509:O523"), Range("H509:N523"), "Tom Turanick"
+
+    MsgBox strMsg
+
+End Sub
+
+Private Sub CheckHours(ByRef rtnStr As String, ByVal checkRange As Excel.Range, ByVal sumRange As Excel.Range, ByVal empName As String)
+    If Len(rtnStr) > 1 Then rtnStr = rtnStr & vbCrLf
+    If Excel.Application.WorksheetFunction.CountA(checkRange) > 1 Then
+        empName = empName & IIf(Right(empName, 1) = "s", "'", "'s") '<- make possessive
+        If Excel.Application.WorksheetFunction.Sum(sumRange) < 40 Then
+            ' Prompt a message
+            rtnStr = rtnStr & empName & " hours are less than 40!"
+        Else
+            rtnStr = rtnStr & empName & " hours look fine"
+        End If
+    Else
+        rtnStr = rtnStr & "There are not enough filled cells for " & empName & "!"
+    End If
+End Sub
