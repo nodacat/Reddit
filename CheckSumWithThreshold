@@ -28,7 +28,7 @@ Public Sub CheckSumWithThreshold()
 
 End Sub
 
-Private Sub CheckHours(ByRef rtnStr As String, ByVal checkRange As Excel.Range, ByVal sumRange As Excel.Range, ByVal empName As String)
+Private Sub CheckHours(ByRef rtnStr As String, ByVal sumRange As Excel.Range, ByVal checkRange As Excel.Range, ByVal empName As String)
     If Len(rtnStr) > 1 Then rtnStr = rtnStr & vbCrLf
     If Excel.Application.WorksheetFunction.CountA(checkRange) > 1 Then
         empName = empName & IIf(Right(empName, 1) = "s", "'", "'s") '<- make possessive
