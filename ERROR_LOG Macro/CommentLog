@@ -182,51 +182,53 @@ Public Sub Comment_Log()
         End With
     End If
     
-    ' - Format Data
-    With wsLog.Range(LOG_HEADER_RANGE).Resize(totalCount, 1).Offset(1, 0)
-        .Resize(, colWidth).WrapText = True
-        .Offset(0, colWidth - 1).Resize(, 1).Interior.Color = vbYellow
-    End With
-    
-    ' - Sort Data
-    With wsLog.Sort
-        .SortFields.Clear
+    If totalCount > 0 Then
+        ' - Format Data
+        With wsLog.Range(LOG_HEADER_RANGE).Resize(totalCount, 1).Offset(1, 0)
+            .Resize(, colWidth).WrapText = True
+            .Offset(0, colWidth - 1).Resize(, 1).Interior.Color = vbYellow
+        End With
         
-        'Sort on Sheet Name
-        .SortFields.Add2 _
-            Key:=wsLog.Range(LOG_HEADER_RANGE).Offset(1, eComRec.com_sheetName - 1).Resize(totalCount, 1), _
-            SortOn:=xlSortOnValues, _
-            Order:=xlAscending, _
-            DataOption:=xlSortNormal
+        ' - Sort Data
+        With wsLog.Sort
+            .SortFields.Clear
             
-        'Sort on Cell Address
-        .SortFields.Add2 _
-            Key:=wsLog.Range(LOG_HEADER_RANGE).Offset(1, eComRec.com_cellLoc - 1).Resize(totalCount, 1), _
-            SortOn:=xlSortOnValues, _
-            Order:=xlAscending, _
-            DataOption:=xlSortNormal
-        
-        'Sort on Item
-        .SortFields.Add2 _
-            Key:=wsLog.Range(LOG_HEADER_RANGE).Offset(1, eComRec.com_item - 1).Resize(totalCount, 1), _
-            SortOn:=xlSortOnValues, _
-            Order:=xlAscending, _
-            DataOption:=xlSortNormal
-        
-        'Sort on Iteration
-        .SortFields.Add2 _
-            Key:=wsLog.Range(LOG_HEADER_RANGE).Offset(1, eComRec.com_iterations - 1).Resize(totalCount, 1), _
-            SortOn:=xlSortOnValues, _
-            Order:=xlAscending, _
-            DataOption:=xlSortNormal
+            'Sort on Sheet Name
+            .SortFields.Add2 _
+                Key:=wsLog.Range(LOG_HEADER_RANGE).Offset(1, eComRec.com_sheetName - 1).Resize(totalCount, 1), _
+                SortOn:=xlSortOnValues, _
+                Order:=xlAscending, _
+                DataOption:=xlSortNormal
+                
+            'Sort on Cell Address
+            .SortFields.Add2 _
+                Key:=wsLog.Range(LOG_HEADER_RANGE).Offset(1, eComRec.com_cellLoc - 1).Resize(totalCount, 1), _
+                SortOn:=xlSortOnValues, _
+                Order:=xlAscending, _
+                DataOption:=xlSortNormal
             
-        .SetRange wsLog.Range(LOG_HEADER_RANGE).Resize(totalCount + 1, colWidth)
-        .Header = xlYes
-        .MatchCase = False
-        .Orientation = xlTopToBottom
-        .SortMethod = xlPinYin
-        .Apply
-    End With
+            'Sort on Item
+            .SortFields.Add2 _
+                Key:=wsLog.Range(LOG_HEADER_RANGE).Offset(1, eComRec.com_item - 1).Resize(totalCount, 1), _
+                SortOn:=xlSortOnValues, _
+                Order:=xlAscending, _
+                DataOption:=xlSortNormal
+            
+            'Sort on Iteration
+            .SortFields.Add2 _
+                Key:=wsLog.Range(LOG_HEADER_RANGE).Offset(1, eComRec.com_iterations - 1).Resize(totalCount, 1), _
+                SortOn:=xlSortOnValues, _
+                Order:=xlAscending, _
+                DataOption:=xlSortNormal
+                
+            .SetRange wsLog.Range(LOG_HEADER_RANGE).Resize(totalCount + 1, colWidth)
+            .Header = xlYes
+            .MatchCase = False
+            .Orientation = xlTopToBottom
+            .SortMethod = xlPinYin
+            .Apply
+        End With
+    End If
     
     ' - Other Formatting
     wsLog.Activate
@@ -349,4 +351,3 @@ Private Function AddComToDic(ByRef dic As Scripting.Dictionary, ByRef com As Obj
     
     AddComToDic = True
 End Function
-
