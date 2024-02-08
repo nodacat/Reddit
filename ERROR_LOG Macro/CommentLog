@@ -112,16 +112,30 @@ Public Sub Comment_Log()
             
         End Select
     Next
-
+    
+    ' - Create new sheet if one doesn't exist
     If wsLog Is Nothing Then
-        append = False
-        Set wsLog = wb.Worksheets.Add(After:=wb.Worksheets(wb.Worksheets.Count))
-        wsLog.Name = logName
-        existingCount = 0
+        If dic.Count > 0 Then
+            ' - If we found comments, then create a new comment log sheet
+            append = False
+            Set wsLog = wb.Worksheets.Add(After:=wb.Worksheets(wb.Worksheets.Count))
+            wsLog.Name = logName
+            existingCount = 0
+            
+        Else
+            ' - If we found no comments, and no sheet exists, we can exit now
+            MsgBox "Done! No comments to report", vbOKOnly, logTitle
+            Exit Sub
+        End If
     End If
     
     ' - Populate log with collection data
     With wsLog.Range(LOG_HEADER_RANGE).Offset(existingCount, 0)
+        ' - Format Comment column as text
+        With .Columns(eComRec.com_text).EntireColumn
+            If .NumberFormat <> "@" Then .NumberFormat = "@"
+        End With
+        
         j = 1
         For i = 0 To dic.Count - 1
             Set col = dic(dic.Keys()(i))
@@ -129,9 +143,9 @@ Public Sub Comment_Log()
                 ' - Collection incldues old and new records, filter for new
                 If col(k)(0) = 1 Then
                     
-                    ' - Add values
+                    ' - Add values to log
                     For v = 1 To eComRec.com_notes
-                        .Offset(j, v - 1).Value2 = col(k)(v) '<- Ouput values
+                        .Offset(j, v - 1).Value2 = col(k)(v)
                     Next
                     
                     ' - Add Link
@@ -147,7 +161,14 @@ Public Sub Comment_Log()
         Next
     End With
     totalCount = addedCount + existingCount
-
+    
+    ' - If no new comments were discovered, exit
+    If addedCount = 0 Then
+        MsgBox "Done! No comments were changed", vbOKOnly, logTitle
+        wsLog.Activate
+        Exit Sub
+    End If
+    
     ' - If new sheet, we must format it
     If Not append Then
         
@@ -179,10 +200,20 @@ Public Sub Comment_Log()
             .Offset(0, eComRec.com_iterations).EntireColumn.ColumnWidth = 8
             .Offset(0, eComRec.com_text).EntireColumn.ColumnWidth = 50
             .Offset(0, eComRec.com_notes).EntireColumn.ColumnWidth = 100
+            
+            ' - Format specific headers
+            .Offset(0, eComRec.com_item).HorizontalAlignment = xlRight
+            .Offset(0, eComRec.com_iterations).HorizontalAlignment = xlRight
         End With
     End If
     
     If totalCount > 0 Then
+        
+        ' - Hide columns left of L
+        With wsLog.Range("L:L", wsLog.Range("L:L").End(xlToRight)).EntireColumn
+            If Not .Hidden Then .Hidden = True
+        End With
+        
         ' - Format Data
         With wsLog.Range(LOG_HEADER_RANGE).Resize(totalCount, 1).Offset(1, 0)
             .Resize(, colWidth).WrapText = True
@@ -206,21 +237,21 @@ Public Sub Comment_Log()
                 SortOn:=xlSortOnValues, _
                 Order:=xlAscending, _
                 DataOption:=xlSortNormal
-            
+                
             'Sort on Item
             .SortFields.Add2 _
                 Key:=wsLog.Range(LOG_HEADER_RANGE).Offset(1, eComRec.com_item - 1).Resize(totalCount, 1), _
                 SortOn:=xlSortOnValues, _
                 Order:=xlAscending, _
                 DataOption:=xlSortNormal
-            
+                
             'Sort on Iteration
             .SortFields.Add2 _
                 Key:=wsLog.Range(LOG_HEADER_RANGE).Offset(1, eComRec.com_iterations - 1).Resize(totalCount, 1), _
                 SortOn:=xlSortOnValues, _
                 Order:=xlAscending, _
                 DataOption:=xlSortNormal
-                
+
             .SetRange wsLog.Range(LOG_HEADER_RANGE).Resize(totalCount + 1, colWidth)
             .Header = xlYes
             .MatchCase = False
@@ -293,12 +324,17 @@ Private Function AddComToDic(ByRef dic As Scripting.Dictionary, ByRef com As Obj
     Dim col As Collection
     Dim iMax As Long, i As Long, maxVal As Long
     Dim iterNum As Long: iterNum = -1
+    Dim textLessName As String
     
     ' - Parse Excel comment object and put it into a consumable format for reporting (in order of eComRec)
     Select Case TypeName(com)
     Case "Comment"
+    
+        ' - Remove the name from the text
+        textLessName = Replace$(com.Text, com.Author & ":" & Chr(10), "")
+    
         comKey = "'" & com.Parent.Worksheet.Name & "'!" & com.Parent.Address(True, True)
-        comValue = Array(1, com.Parent.Worksheet.Name, com.Parent.Address(True, True), "Comment", itemNum, -1, com.Author, com.Text, "")
+        comValue = Array(1, com.Parent.Worksheet.Name, com.Parent.Address(True, True), "Comment", itemNum, -1, com.Author, textLessName, "")
     Case "CommentThreaded"
         If itemNum = 0 Then
             comKey = "'" & com.Parent.Worksheet.Name & "'!" & com.Parent.Address(True, True)
