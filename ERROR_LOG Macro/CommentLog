@@ -325,13 +325,19 @@ Private Function AddComToDic(ByRef dic As Scripting.Dictionary, ByRef com As Obj
     Dim iMax As Long, i As Long, maxVal As Long
     Dim iterNum As Long: iterNum = -1
     Dim textLessName As String
+    Dim tmpNL As Variant
     
     ' - Parse Excel comment object and put it into a consumable format for reporting (in order of eComRec)
     Select Case TypeName(com)
     Case "Comment"
     
-        ' - Remove the name from the text
-        textLessName = Replace$(com.Text, com.Author & ":" & Chr(10), "")
+        ' - Remove the name from the text (clear any variant of newline)
+        For Each tmpNL In Array(vbCrLf, vbNewLine, vbLf, vbCr)
+            If InStr(1, com.Text, com.Author & ":" & tmpNL, vbBinaryCompare) > 0 Then
+                textLessName = Replace$(com.Text, com.Author & ":" & tmpNL, "")
+                Exit For
+            End If
+        Next
     
         comKey = "'" & com.Parent.Worksheet.Name & "'!" & com.Parent.Address(True, True)
         comValue = Array(1, com.Parent.Worksheet.Name, com.Parent.Address(True, True), "Comment", itemNum, -1, com.Author, textLessName, "")
@@ -387,3 +393,4 @@ Private Function AddComToDic(ByRef dic As Scripting.Dictionary, ByRef com As Obj
     
     AddComToDic = True
 End Function
+
