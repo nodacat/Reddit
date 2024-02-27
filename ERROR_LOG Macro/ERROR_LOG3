@@ -4,6 +4,10 @@ Const ERRORS_SHEETNAME As String = "{ Errors }"
 Const TYPOS_SHEETNAME As String = "{ Typos }"
 Const CIRCS_SHEETNAME As String = "{ Circs }"
 
+Const ERRORS_HEADERS As String = "Sheet Name,Cell Location,Error Type,Reviewed?,Notes"
+Const TYPOS_HEADERS As String = "Sheet Name,Cell Location,Typo,Reviewed?,Notes"
+Const CIRCS_HEADERS As String = "Sheet Name,Cell Location,Error Type,Reviewed?,Notes"
+
 Const ERRORS_TITLE As String = "Error Log"
 Const TYPOS_TITLE As String = "Typos Log"
 Const CIRCS_TITLE As String = "Circular Reference Log"
@@ -79,7 +83,7 @@ Public Sub Log_Errors()
         End With
         
         ' - populate collection to error log sheet
-        PopulateLogFromCollection wsLog, col, logTitle
+        PopulateLogFromCollection wsLog, col, logTitle, ERRORS_HEADERS
         
     End If
 
@@ -150,7 +154,7 @@ Public Sub Log_Typos()
                     ' - per cell check logic
                     If Not IsError(rng.Value2) Then
                         If Not Excel.Application.CheckSpelling(rng.Value2) Then
-                            col.Add Array(ws.Name, rng.Address(True, True), "#SPELL")
+                            col.Add Array(ws.Name, rng.Address(True, True), rng.Value2)
                         End If
                     End If
                     '-------------------------------------------------------------------
@@ -170,7 +174,7 @@ Public Sub Log_Typos()
         End With
         
         ' - populate collection to error log sheet
-        PopulateLogFromCollection wsLog, col, logTitle
+        PopulateLogFromCollection wsLog, col, logTitle, TYPOS_HEADERS
         
     End If
 
@@ -275,7 +279,7 @@ Public Sub Log_Circs()
         End With
         
         ' - populate collection to error log sheet
-        PopulateLogFromCollection wsLog, col, logTitle
+        PopulateLogFromCollection wsLog, col, logTitle, CIRCS_HEADERS
         
     End If
 
@@ -364,7 +368,7 @@ funcError:
 End Function
 
 
-Private Sub PopulateLogFromCollection(ByRef wsLog As Excel.Worksheet, ByRef col As Collection, ByVal title As String)
+Private Sub PopulateLogFromCollection(ByRef wsLog As Excel.Worksheet, ByRef col As Collection, ByVal title As String, ByVal headers As String)
     'Purpose: breakout logic for eash of future maintance
     'Assumes:
     ' - wsLog is empty and unformatted
@@ -377,7 +381,7 @@ Private Sub PopulateLogFromCollection(ByRef wsLog As Excel.Worksheet, ByRef col 
     Dim i As Long
     
     ' - Add Headers
-    wsLog.Range(LOG_HEADER_RANGE).Resize(1, 5).Value2 = Array("Sheet Name", "Cell Location", "Error Type", "Reviewed?", "Notes")
+    wsLog.Range(LOG_HEADER_RANGE).Resize(1, 5).Value2 = Split(headers, ",")
     
     ' - Loop through collection and populate data to sheet
     colWidth = UBound(col.Item(1), 1) - LBound(col.Item(1), 1) + 1
@@ -408,7 +412,7 @@ Private Sub PopulateLogFromCollection(ByRef wsLog As Excel.Worksheet, ByRef col 
             .Font.Size = 20
         End With
         With .Range(LOG_TITLE_RANGE).Resize(1, colWidth)
-            .EntireRow.rowHeight = 26.25
+            .EntireRow.RowHeight = 26.25
             .Borders(xlEdgeBottom).LineStyle = xlContinuous
             .Borders(xlEdgeBottom).Weight = xlThick
             .Borders(xlEdgeTop).LineStyle = xlContinuous
