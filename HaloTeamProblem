@@ -8,10 +8,19 @@
 #   use this excel formula to help populate, example has Names in B7:B20 and NC Scores in C7:C20
 #   ="{"&TEXTJOIN(", ",TRUE,"'"&B7:B20&"' : "&C7:C20)&"}"
 #   CAPTAINS: assign second parameter to team, example 'John':[4.5,1] would be assigned to team 1. 'John':[4.5,0] would be a free agent
-people = {'Rish':[-2.67,0],'Jordan S.':[-0.02,4],'Tavaris':[0.81,0],'Cisco':[1.00,0],'Craig':[2.79,0],'JP':[2.90,3],'Brandon P.':[3.09,3],'John P.':[4.39,0],'Nick M.':[4.98,2],'Matt':[6.67,4],'Peter P.':[8.49,0],'Billy':[9.13,1],'Kyle R.':[9.14,1],'Nick J.':[12.71,0],'Dom':[13.36,0],'TJ':[14.68,2]}
+#people = {'Rish':[-2.67,0],'Jordan S.':[-0.02,4],'Tavaris':[0.81,0],'Cisco':[1.00,0],'Craig':[2.79,0],'JP':[2.90,3],'Brandon P.':[3.09,3],'John P.':[4.39,0],'Nick M.':[4.98,2],'Matt':[6.67,4],'Peter P.':[8.49,0],'Billy':[9.13,1],'Kyle R.':[9.14,1],'Nick J.':[12.71,0],'Dom':[13.36,0],'TJ':[14.68,2]}
+#people = {'Jackie':[-7.14,0],'Kevin B.':[-6.77,0],'Rish':[-2.67,0],'Jordan S.':[-0.02,1],'Tavaris':[0.81,0],'JP':[2.90,4],'Brandon P.':[3.09,4],'Joel':[4.28,0],'Nick M':[4.98,3],'Matt':[6.67,1],'Adam K.':[6.76,0],'Josh Z.':[7.90,0],'John S.':[8.35,0],'Billy':[9.13,2],'Nick J.':[12.71,0],'TJ':[14.68,3]}
+#people = {'Jackie':[-7.14,0],'Rish':[-2.67,0],'Jordan S.':[-0.02,4],'JP':[2.90,3],'Brandon P.':[3.09,3],'Joel':[4.28,0],'Nick M':[4.98,1],'Matt':[6.67,4],'Adam K.':[6.76,0],'Josh Z.':[7.90,0],'Peter':[8.49,0],'Billy':[9.13,2],'Nick J.':[12.71,0],'Jordan P.':[12.92,0],'TJ':[14.68,1],'Ryan':[21.50,0]}
+people = {'Jackie':[-7.14,0],'Kevin B.':[-6.77,0],'Rish':[-2.67,0],'Jordan S.':[-0.02,1],'Tavaris':[0.81,0],'JP':[2.90,4],'Brandon P.':[3.09,4],'Joel':[4.28,0],'Nick M':[4.98,3],'Matt':[6.67,1],'Adam K.':[6.76,0],'Josh Z.':[7.90,0],'John S.':[8.35,0],'Billy':[9.13,2],'Nick J.':[12.71,0],'TJ':[14.68,3]}
 
-#maximum time to return whatever the current best answer is
-maxWait = 4000 
+#goal seaking limiter. Algo will return all team combinations with a total score less than this number
+maxScore = 3.0
+
+#number of options youd like to return if possible.  Setting to 5 will return the best 0-5 options.  Set to -1 to return all options
+maxOptions = -1
+
+#maximum time to return whatever the current best answers are
+maxWait = 20
 
 #Team Count
 #   this sets the number of teams you'd like to return, and evenly distributes the number of people into that group
@@ -32,33 +41,37 @@ from math import ceil
 
 #Class to help break out of nested loops later
 class LoopLeave(Exception):
-	#https://stackoverflow.com/questions/653509/breaking-out-of-nested-loops
-	pass
+    #https://stackoverflow.com/questions/653509/breaking-out-of-nested-loops
+    pass
+
+print("[BEGIN]===================================================================")
 
 numPeople = len(people)
 numTeams = teamCount[numPeople]
 dummyCount = int((numTeams - (numPeople/numTeams % 1) * numTeams) % numTeams)
 maxDummiesPerTeam = int(ceil(dummyCount/numTeams))
 
+
 #Add Dummies if needed
-print("Creating " + str(dummyCount) + " dummy(s) with NC score of " + str(dummyNCScore))
 dummySet = set([f'DUMMY{i}' for i in range(dummyCount)])
 if dummyCount > 0:
-	for i in range(dummyCount):
-		people[list(dummySet)[i]] = [dummyNCScore,0]
-	numPeople = len(people)
+    for i in range(dummyCount):
+        people[list(dummySet)[i]] = [dummyNCScore,0]
+    numPeople = len(people)
+print(" - Added " + str(dummyCount) + " dummy(s) with NC score of " + str(dummyNCScore))
 
-print("Preparing " + str(numTeams) + " teams of " + str(int(numPeople/numTeams)) + " people each...")
 
 #Get list of all possible combinations of people (teams)
 mean = sum(score[0] for score in people.values()) / numPeople
 people = dict(sorted(people.items(), key=lambda item: item[1]))
 teams = list(itertools.combinations(people.keys(), int(numPeople/numTeams)))
 teamScores = [0 for i in range(len(teams))]
+teamHeadCount = int(numPeople/numTeams)
+print (" - Mean player score: " + str(mean))
 
 #Get variance to mean for each team combination
 for i in range(len(teams)):
-	teamScores[i] = abs(sum(people[person][0] - mean for person in teams[i]))
+    teamScores[i] = abs(sum(people[person][0] - mean for person in teams[i]))
 
 #Sort list to optimze search
 teams_sorted = [t for _, t in sorted(zip(teamScores,teams))]
@@ -67,85 +80,137 @@ scores_sorted = [t for _, t in sorted(zip(teamScores,teamScores))]
 #Build captain sets
 captains = [set(), set(), set(), set()]
 for c in people:
-	if people[c][1] != 0:
-		#add to corrisponding team
-		captains[people[c][1]-1].add(c)
+    if people[c][1] != 0:
+        #add to corrisponding team
+        captains[people[c][1]-1].add(c)
+print(" - Assigned " + str(len(captains)) + " Captains")
 
 #Reduce all team combinations to the best team with minimal difference
 totCombos = len(teams_sorted)
 tmpScore = 0
-minScore = max([p[0] for p in people.values()]) * numTeams
-minCombo = []
+tmpCombo = []
 timeOut = time.time() + maxWait
+foundScores = []
+foundCombos = []
+
+print(" - Team combo max score set to: " + str(maxScore))
+print(" - Max wait time set to: " + str(maxWait) + " seconds")
+print(" - Preparing " + str(numTeams) + " teams of " + str(teamHeadCount) + " people each...")
 
 try:
-	#Check Team A Grouping
-	for a in range(totCombos):
-		sa = set(teams_sorted[a])
-		if (scores_sorted[a] < minScore) and (len((sa & dummySet)) <= maxDummiesPerTeam) and (captains[0].issubset(sa)):
-			if numTeams <= 1:
-				tmpScore = scores_sorted[a]
-				if tmpScore < minScore:
-					minScore = tmpScore
-					minCombo = [sa]
-					print("[FOUND]:           ","Teams:",minCombo,"Variance:",minScore)
-			else:
+    for a in range(totCombos):
+        sa = set(teams_sorted[a])
+        if (captains[0].issubset(sa)) and (scores_sorted[a] < maxScore):
+            if numTeams == 1:
+                #check if team score is < threashold
+                tmpScore = scores_sorted[a]
+                tmpCombo = [sa]
+                if tmpScore < maxScore:
+                    #collect valid team
+                    foundScores.append(tmpScore)
+                    foundCombos.append(tmpCombo)
+                    print("[FOUND]:           ","Teams:",tmpCombo,"Variance:",tmpScore)
+                    
+                if time.time() > timeOut:
+                    raise LoopLeave
+            
+            else: #numTeams > 1
 
-				#Check Team B Grouping
-				for b in range(totCombos):
-					sb = set(teams_sorted[b])
-					if not ((sb & sa)) and (scores_sorted[b] < minScore) and (len((sb & dummySet))<=maxDummiesPerTeam) and (captains[1].issubset(sb)):
-						if numTeams <= 2:
-							tmpScore = scores_sorted[a] + scores_sorted[b]
-							if tmpScore < minScore:
-								minScore = tmpScore
-								minCombo = [sa, sb]
-								print("[FOUND]:           ","Teams:",minCombo,"Variance:",minScore)
-							if time.time() > timeOut:
-								raise LoopLeave
-						else:
+                for b in range(totCombos):
+                    sb = set(teams_sorted[b])
+                    if not (sb & sa) and (scores_sorted[b] < maxScore)  and (captains[1].issubset(sb)):
+                        if numTeams == 2:
+                            #check if team score is < threashold
+                            tmpScore = scores_sorted[a] + scores_sorted[b]
+                            tmpCombo = [sa, sb]
+                            if tmpScore < maxScore:
+                                foundScores.append(tmpScore)
+                                foundCombos.append(tmpCombo)
+                                #collect valid team
+                                print("[FOUND]:           ","Teams:",tmpCombo,"Variance:",tmpScore)
+                                
+                            if time.time() > timeOut:
+                                raise LoopLeave
+                        else: #numTeams > 2
 
-							#Check Team C Grouping
-							for c in range(totCombos):
-								sc = set(teams_sorted[c])
-								if not ((sc & sa) or (sc & sb)) and (scores_sorted[c] < minScore) and (len((sc & dummySet))<=maxDummiesPerTeam) and (captains[2].issubset(sc)):
-									if numTeams <= 3:
-										tmpScore = scores_sorted[a] + scores_sorted[b] + scores_sorted[c]
-										if tmpScore < minScore:
-											minScore = tmpScore
-											minCombo = [sa, sb, sc]
-											print("[FOUND]:           ","Teams:",minCombo,"Variance:",minScore)
-										if time.time() > timeOut:
-											raise LoopLeave
-									else:
+                            for c in range(totCombos):
+                                sc = set(teams_sorted[c])
+                                if not ((sc & sa) or (sc & sb)) and (scores_sorted[c] < maxScore)  and (captains[2].issubset(sc)):
+                                    if numTeams == 3:
+                                        #check if team score is < threashold
+                                        tmpScore = scores_sorted[a] + scores_sorted[b] + scores_sorted[c]
+                                        tmpCombo = [sa, sb, sc]
+                                        if tmpScore < maxScore:
+                                            #collect valid team
+                                            foundScores.append(tmpScore)
+                                            foundCombos.append(tmpCombo)
+                                            print("[FOUND]:           ","Teams:",tmpCombo,"Variance:",tmpScore)
+                                            
+                                        if time.time() > timeOut:
+                                            raise LoopLeave
+                                    else:
 
-										#Check Team D Grouping
-										for d in range(totCombos):
-											sd = set(teams_sorted[d])
-											if not ((sd & sa) or (sd & sb) or (sd & sc)) and (scores_sorted[d] < minScore) and (len((sd & dummySet))<=maxDummiesPerTeam) and (captains[3].issubset(sd)):
-												if numTeams <= 4:
-													tmpScore = scores_sorted[a] + scores_sorted[b] + scores_sorted[c] + scores_sorted[d]
-													if tmpScore < minScore:
-														minScore = tmpScore
-														minCombo = [sa, sb, sc, sd]
-														print("[FOUND]:           ","Teams:",minCombo,"Variance:",minScore)
-													if time.time() > timeOut:
-														raise LoopLeave
+                                        for d in range(totCombos):
+                                            sd = set(teams_sorted[d])
+                                            if not ((sd & sa) or (sd & sb) or (sd & sc)) and (scores_sorted[d] < maxScore)  and (captains[3].issubset(sd)):                                                
+                                                if numTeams == 4:
+                                                    #check if team score is < threashold
+                                                    tmpScore = scores_sorted[a] + scores_sorted[b] + scores_sorted[c] + scores_sorted[d]
+                                                    tmpCombo = [sa, sb, sc, sd]
+                                                    if tmpScore < maxScore:
+                                                        #collect valid team
+                                                        foundScores.append(tmpScore)
+                                                        foundCombos.append(tmpCombo)
+                                                        print("[FOUND]:           ","Teams:",tmpCombo,"Variance:",tmpScore)
+                                                    
+                                                    if time.time() > timeOut:
+                                                        raise LoopLeave
+
 
 except LoopLeave:
-	print("[TIME REACHED]:    ", maxWait, " seconds")
-	pass
+    print("[TIME REACHED]:    ", maxWait, " seconds")
+    pass
 
-#Output results in Excel tab delimited format, sorted by NC, eliminate 'dummy' people
-print("[COPY TO EXCEL]:")
-print("Final Varince:",minScore)
-for i in range(len(minCombo)):
-	members = list(minCombo[i])
+print(" - Search complete. Ordering, Formatting and deduplicating output...")
 
-	#remove dummies
-	for j in range(len(members)-1,0,-1):
-		if "DUMMY" in members[j]:
-			members.pop(j)
 
-	member_scores = [people[members[x]] for x in range(len(members))]
-	print(f"Team{i+1}\t"+"\t".join([m for _, m in sorted(zip(member_scores,members), key=None, reverse=True)]))
+#Sort found combos
+foundCombos_sorted = [t for _, t in sorted(zip(foundScores,foundCombos))]
+foundScores_sorted = [t for _, t in sorted(zip(foundScores,foundScores))]
+
+#Remove duplicates (ex duplicate: ABCD == DCBA)
+for i in range(len(foundCombos_sorted)):
+    for j in range(len(foundCombos_sorted)):
+        if i != j:
+            dupeCount = 0
+            for m in range(numTeams):
+                for n in range(numTeams):
+                    if len(foundCombos_sorted[i][m] & foundCombos_sorted[j][n]) == teamHeadCount:
+                        dupeCount += 1
+            if dupeCount >= numTeams:
+                print("Duplicate combo found!")
+                print(foundCombos_sorted[i], foundCombos_sorted[j])
+
+if maxOptions < 0:
+    maxOptions = len(foundCombos_sorted)
+    print(" - Returning all [" + str(maxOptions) + "] options...")
+elif len(foundCombos_sorted) > maxOptions:
+    print(" - Returning best [" + str(maxOptions) + "] out of [" + str(len(foundCombos_sorted)) + "] options...")
+else:
+    print(" - Returning all [" + str(maxOptions) + "] options...")
+
+print("\n[COPY TO EXCEL]-----------------------------------------------------------------------------------------------------------------------------")
+for option in range(min(len(foundCombos_sorted), maxOptions)):
+    c = foundCombos_sorted[option]
+    print("\nOPTION:\t", str(option+1), "\tVariance:",str(foundScores_sorted[option]))
+    for i in range(len(c)):
+        members = list(c[i])
+
+        #remove dummies
+        for j in range(len(members)-1,-1,-1):
+            if "DUMMY" in members[j]:
+                members.pop(j)
+
+        member_scores = [people[members[x]] for x in range(len(members))]
+        print(f"Team{i+1}\t"+"\t".join([m for _, m in sorted(zip(member_scores,members), key=None, reverse=True)]))
+print("\n[FINISHED]==================================================================================================================================")
