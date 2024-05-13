@@ -42,7 +42,7 @@ class LoopLeave(Exception):
     #https://stackoverflow.com/questions/653509/breaking-out-of-nested-loops
     pass
 
-print("[BEGIN]===================================================================")
+print("[BEGIN]====================================================================================================================================")
 
 numPeople = len(people)
 numTeams = teamCount[numPeople]
@@ -177,8 +177,8 @@ foundCombos_sorted = [t for _, t in sorted(zip(foundScores,foundCombos))]
 foundScores_sorted = [t for _, t in sorted(zip(foundScores,foundScores))]
 
 #Remove duplicates (ex duplicate: ABCD == DCBA)
-for i in range(len(foundCombos_sorted)-1, 0, -1):
-    for j in range(len(foundCombos_sorted)-1, 0, -1):
+for i in range(len(foundCombos_sorted)-1, -1, -1):
+    for j in range(len(foundCombos_sorted)-1, -1, -1):
         if i != j:
             dupeCount = 0
             for m in range(numTeams):
@@ -192,16 +192,16 @@ for i in range(len(foundCombos_sorted)-1, 0, -1):
                 foundCombos_sorted.pop(j)
                 foundScores_sorted.pop(j)
 
-if maxOptions < 0:
+#Resolve maxOptions
+if (maxOptions < 0) or (maxOptions >= len(foundCombos_sorted)):
     maxOptions = len(foundCombos_sorted)
     print(" - Returning all [" + str(maxOptions) + "] options...")
-elif len(foundCombos_sorted) > maxOptions:
-    print(" - Returning best [" + str(maxOptions) + "] out of [" + str(len(foundCombos_sorted)) + "] options...")
 else:
-    print(" - Returning all [" + str(maxOptions) + "] options...")
+    print(" - Returning best [" + str(maxOptions) + "] out of [" + str(len(foundCombos_sorted)) + "] options...")
 
+#output to excel(tab) formatted list
 print("\n[COPY TO EXCEL]-----------------------------------------------------------------------------------------------------------------------------")
-for option in range(min(len(foundCombos_sorted), maxOptions)):
+for option in range(maxOptions):
     c = foundCombos_sorted[option]
     print("\nOPTION:\t", str(option+1), "\tVariance:",str(foundScores_sorted[option]))
     for i in range(len(c)):
