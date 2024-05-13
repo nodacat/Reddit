@@ -8,11 +8,10 @@
 #   use this excel formula to help populate, example has Names in B7:B20 and NC Scores in C7:C20
 #   ="{"&TEXTJOIN(", ",TRUE,"'"&B7:B20&"' : "&C7:C20)&"}"
 #   CAPTAINS: assign second parameter to team, example 'John':[4.5,1] would be assigned to team 1. 'John':[4.5,0] would be a free agent
-#people = {'Jackie':[-7.14,0],'Rish':[-2.67,0],'Jordan S.':[-0.02,4],'JP':[2.90,3],'Brandon P.':[3.09,3],'Joel':[4.28,0],'Nick M':[4.98,1],'Matt':[6.67,4],'Adam K.':[6.76,0],'Josh Z.':[7.90,0],'Peter':[8.49,0],'Billy':[9.13,2],'Nick J.':[12.71,0],'Jordan P.':[12.92,0],'TJ':[14.68,1],'Ryan':[21.50,0]}
 people = {'Jackie':[-7.14,0],'Kevin B.':[-6.77,0],'Rish':[-2.67,0],'Jordan S.':[-0.02,1],'Tavaris':[0.81,0],'JP':[2.90,4],'Brandon P.':[3.09,4],'Joel':[4.28,0],'Nick M':[4.98,3],'Matt':[6.67,1],'Adam K.':[6.76,0],'Josh Z.':[7.90,0],'John S.':[8.35,0],'Billy':[9.13,2],'Nick J.':[12.71,0],'TJ':[14.68,3]}
 
 #goal seaking limiter. Algo will return all team combinations with a total score less than this number
-maxScore = 3.0
+maxScore = 7.0
 
 #number of options youd like to return if possible.  Setting to 5 will return the best 0-5 options.  Set to -1 to return all options
 maxOptions = -1
@@ -177,8 +176,8 @@ foundCombos_sorted = [t for _, t in sorted(zip(foundScores,foundCombos))]
 foundScores_sorted = [t for _, t in sorted(zip(foundScores,foundScores))]
 
 #Remove duplicates (ex duplicate: ABCD == DCBA)
-for i in range(len(foundCombos_sorted)):
-    for j in range(len(foundCombos_sorted)):
+for i in range(len(foundCombos_sorted)-1, 0, -1):
+    for j in range(len(foundCombos_sorted)-1, 0, -1):
         if i != j:
             dupeCount = 0
             for m in range(numTeams):
@@ -186,8 +185,11 @@ for i in range(len(foundCombos_sorted)):
                     if len(foundCombos_sorted[i][m] & foundCombos_sorted[j][n]) == teamHeadCount:
                         dupeCount += 1
             if dupeCount >= numTeams:
-                print("Duplicate combo found!")
-                print(foundCombos_sorted[i], foundCombos_sorted[j])
+                print("[REMVOED DUPLICATE]")
+                print("  COMBO[" + str(i) + "]          : " + foundCombos_sorted[j])
+                print("  COMBO[" + str(j) + "] (removed): " + foundCombos_sorted[j])
+                foundCombos_sorted.pop(j)
+                foundScores_sorted.pop(j)
 
 if maxOptions < 0:
     maxOptions = len(foundCombos_sorted)
