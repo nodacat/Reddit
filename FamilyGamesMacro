@@ -1,0 +1,183 @@
+Option Explicit
+
+Public Const MAX_ENTRY_ROWS As Long = 10
+
+Public Sub ResetPlayerData()
+    'Clear user-entered player names and scores from data entry
+    Range("entTeamStart").Offset(0, 1).Resize(MAX_ENTRY_ROWS, 2).Value2 = ""
+End Sub
+
+Public Sub ResetEntry()
+    'Clear user-entered game name from data entry
+    Range("entGameName").Value2 = ""
+    
+    'Clear user-entered game type from data entry
+    Range("entGameType").Value2 = ""
+    
+    ResetPlayerData
+
+End Sub
+
+Public Sub SubmitEntry()
+    Dim i As Long
+    Dim rng As Excel.Range
+    Dim row_count As Long
+    Dim matchID As Long
+    Dim matchWinner As String
+    Dim matchResult As String
+    Dim gameName As String
+    Dim gameType As String
+    Dim teamName As String
+    Dim H2HID As String
+    Dim H2HPlayers As String
+    Dim teamAPlayers As String
+    Dim teamBPlayers As String
+    Dim playerName As String
+    Dim playerScore As Double
+    Dim playerPoints As Double
+    Dim tblMatches As ListObject
+    Dim wsData As Excel.Worksheet
+    Dim wsEntry As Excel.Worksheet
+    
+    On Error GoTo SubError
+    
+    Set wsData = Excel.ThisWorkbook.Worksheets("Data")
+    Set wsEntry = Excel.ThisWorkbook.Worksheets("Entry")
+    
+    With Excel.Application
+        .ScreenUpdating = False
+        .Calculation = xlCalculationManual
+    End With
+    
+    row_count = 0
+    matchID = Range("valLastMatch").Value2 + 1
+    Set tblMatches = wsData.ListObjects("tblMatches")
+    
+    'After user has entered data in the Entry form, check it and load to tblMatches
+    
+    'Check User Inputs
+    
+    ' - Check Game Name
+    If Range("entGameName").Value2 = "" Then
+        Err.Raise vbObjectError + 21, "SubmitEntry()", "Missing game name in " & Range("entGameName").Address
+    Else
+        gameName = CStr(Range("entGameName").Value2)
+    End If
+    
+    ' - Check Game Type
+    If Range("entGameType").Value2 = "" Then
+        Err.Raise vbObjectError + 22, "SubmitEntry()", "Missing game type" & Range("entGameType").Address
+    Else
+        gameType = CStr(Range("entGameType").Value2)
+    End If
+    
+    ' - Check TeamPlayers
+    If Range("entTeamA").Value2 <> "" And Range("entTeamB").Value2 <> "" Then
+        teamAPlayers = CStr(Range("entTeamA").Value2)
+        teamBPlayers = CStr(Range("entTeamB").Value2)
+    Else
+        Err.Raise vbObjectError + 27, "SubmitEntry()", "Check team players in " & Range("entTeamA").Address() & " and " & Range("entTeamB").Address()
+    End If
+    
+    ' - Check Match Winner
+    Select Case Range("entMatchWinner").Value2
+    Case "TeamA", "TeamB", "Draw"
+        matchWinner = CStr(Range("entMatchWinner").Value2)
+    Case ""
+        Err.Raise vbObjectError + 25, "SubmitEntry()", "Invalid winner '" & Range("entMatchWinner").Value2 & "'"
+    Case Else
+        Err.Raise vbObjectError + 25, "SubmitEntry()", "Macro has not yet been set up to handle more than TeamA or TeamB values in the Team column"
+    End Select
+    
+    ' - Check Players & Scores
+    Set rng = Range("entTeamStart")
+    For i = 0 To MAX_ENTRY_ROWS - 1
+        Select Case rng.Offset(i, 0)
+        Case "TeamA", "TeamB"
+            
+            teamName = CStr(rng.Offset(i, 0).Value2)
+            If teamAPlayers < teamBPlayers Then 'Sort
+                H2HID = teamAPlayers & " - " & teamBPlayers
+            Else
+                H2HID = teamBPlayers & " - " & teamAPlayers
+            End If
+            
+            If teamName = "TeamA" Then
+                H2HPlayers = teamAPlayers & " - " & teamBPlayers
+            Else
+                H2HPlayers = teamBPlayers & " - " & teamAPlayers
+            End If
+            
+            
+            If matchWinner = "Draw" Then
+                matchResult = "D"
+            ElseIf teamName = matchWinner Then
+                matchResult = "W"
+            Else
+                matchResult = "L"
+            End If
+            
+            ' - Check player name
+            If rng.Offset(i, 1).Value2 = "" Then
+                Err.Raise vbObjectError + 23, "SubmitEntry()", "Missing player name in " & rng.Offset(i, 1).Address
+            Else
+                playerName = CStr(rng.Offset(i, 1).Value2)
+            End If
+            
+            ' - Check player score
+            If rng.Offset(i, 2).Value2 = "" Or Not IsNumeric(rng.Offset(i, 2).Value2) Then
+                Err.Raise vbObjectError + 24, "SubmitEntry()", "Invalid score in " & rng.Offset(i, 2).Address
+            Else
+                playerScore = CDbl(rng.Offset(i, 2).Value2)
+            End If
+            
+            ' - Check player points
+            If rng.Offset(i, 3).Value2 = "" Or Not IsNumeric(rng.Offset(i, 3).Value2) Then
+                Err.Raise vbObjectError + 24, "SubmitEntry()", "Invalid score in " & rng.Offset(i, 3).Address
+            Else
+                playerPoints = CDbl(rng.Offset(i, 3).Value2)
+            End If
+            
+            ' - Load data to array
+            With tblMatches.ListRows.Add
+                .Range(, 1).Resize(1, 10).Value2 = Array(matchID, matchResult, gameName, gameType, teamName, H2HID, H2HPlayers, playerName, playerScore, playerPoints)
+            End With
+            
+            row_count = row_count + 1
+            
+        Case Is <> ""
+            Err.Raise vbObjectError + 25, "SubmitEntry()", "Macro has not yet been set up to handle more than TeamA or TeamB values in the Team column"
+        Case Else
+            'Do nothing, this line is not part of a team
+        End Select
+    Next
+    
+    If row_count > 0 Then
+        MsgBox CStr(row_count) & " rows were added!"
+        
+        'Clear entry if settings are preset
+        If wsEntry.Shapes("optResetAll").ControlFormat.Value = 1 Then
+            ResetEntry
+        ElseIf wsEntry.Shapes("optResetPlayerData").ControlFormat.Value = 1 Then
+            ResetPlayerData
+        Else
+            'optNoReset is set / do nothing
+        End If
+        
+    Else
+        MsgBox "No rows were added"
+    End If
+    
+    
+    
+SubError:
+    With Excel.Application
+        .ScreenUpdating = True
+        .Calculation = xlCalculationAutomatic
+    End With
+    Select Case Err.Number
+    Case 0 'No Error
+    Case Else
+        Err.Raise Err.Number, , Err.Description
+    End Select
+End Sub
